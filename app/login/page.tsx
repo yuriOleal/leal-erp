@@ -1,3 +1,18 @@
+// ================================================================
+// TELA DE LOGIN / REGISTRO / RECUPERAÇÃO DE SENHA
+//
+// Modos disponíveis (controlados pelo state `mode`):
+// - 'login':    Tela padrão — email + senha para entrar
+// - 'register': Criar uma nova conta (Sign Up)
+// - 'forgot':   Recuperar senha esquecida (envia link por email)
+//
+// Fluxo de autenticação:
+// 1. Usuário preenche o formulário (validado com Zod via React Hook Form)
+// 2. Os dados são enviados ao Supabase Auth (signInWithPassword / signUp / resetPasswordForEmail)
+// 3. Em caso de sucesso: redireciona para /dashboard
+// 4. Em caso de erro: mostra mensagem traduzida em português
+// ================================================================
+
 'use client';
 
 import { useState } from 'react';
@@ -14,41 +29,58 @@ import { EyeIcon, EyeOffIcon, ArrowLeft, AlertCircle, CheckCircle } from 'lucide
 import { motion } from 'motion/react';
 import Link from 'next/link';
 
+// ─── TIPOS ────────────────────────────────────────────────────────
+
+/**
+ * Formato dos dados do formulário (apenas email e senha).
+ * O campo "remember" não está incluso aqui pois não é usado pelo Supabase.
+ */
 type LoginFormValues = {
   email: string;
   password: string;
 };
 
+/**
+ * Modos de operação da tela.
+ */
 type Mode = 'login' | 'register' | 'forgot';
+
+// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>('login');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const supabase = createClient(); // Cliente Supabase para o navegador
 
+  // ── Estados locais ──
+  const [showPassword, setShowPassword] = useState(false); // Mostrar/ocultar senha
+  const [isLoading, setIsLoading] = useState(false);       // Loading do botão
+  const [mode, setMode] = useState<Mode>('login');         // Modo atual da tela
+  const [error, setError] = useState<string | null>(null); // Mensagem de erro
+  const [success, setSuccess] = useState<string | null>(null); // Mensagem de sucesso
+
+  // ── Configuração do React Hook Form com validação Zod ──
   const {
-    register,
-    handleSubmit,
-    getValues,
-    formState: { errors },
+    register,           // Registra inputs no form
+    handleSubmit,       // Wrapper para onSubmit com validação
+    formState: { errors }, // Erros de validação de cada campo
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema), // Conecta o schema Zod ao form
     defaultValues: { email: '', password: '' },
   });
 
+  // ── Tradutor de erros do Supabase para português ──
+  // O Supabase retorna mensagens em inglês. Esta função converte
+  // para mensagens amigáveis em português.
   const translateError = (msg: string): string => {
     if (msg.includes('Invalid login credentials')) return 'Email ou senha incorretos.';
     if (msg.includes('Email not confirmed')) return 'Confirme seu email antes de fazer login.';
     if (msg.includes('User already registered')) return 'Este email já possui uma conta. Faça login.';
     if (msg.includes('Password should be at least')) return 'A senha deve ter pelo menos 6 caracteres.';
     if (msg.includes('rate limit')) return 'Muitas tentativas. Aguarde alguns minutos.';
-    return msg;
+    return msg; // Se não for um erro conhecido, mostra a mensagem original
   };
 
+  // ── Handler do formulário (login, registro ou recuperação de senha) ──
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
@@ -56,14 +88,20 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
+        // 🔐 LOGIN: Autentica o usuário com email + senha
         const { error } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
         });
         if (error) { setError(translateError(error.message)); return; }
+
+        // Login bem-sucedido: redireciona para o dashboard
         router.push('/dashboard');
-        router.refresh();
+        router.refresh(); // Força o Next.js a revalidar os dados da página
+
       } else if (mode === 'register') {
+        // 📝 REGISTRO: Cria uma nova conta
+        // O Supabase enviará um email de confirmação automaticamente
         const { error } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
@@ -72,13 +110,17 @@ export default function LoginPage() {
           },
         });
         if (error) { setError(translateError(error.message)); return; }
+
         setSuccess('Conta criada! Verifique seu email para ativar o acesso.');
-        setMode('login');
+        setMode('login'); // Volta para a tela de login
+
       } else if (mode === 'forgot') {
+        // 🔄 RECUPERAÇÃO: Envia um link de reset por email
         const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
           redirectTo: `${window.location.origin}/login`,
         });
         if (error) { setError(translateError(error.message)); return; }
+
         setSuccess('Email de recuperação enviado! Verifique sua caixa de entrada.');
         setMode('login');
       }
@@ -87,6 +129,7 @@ export default function LoginPage() {
     }
   };
 
+  // ── Configuração de textos por modo ──
   const modeConfig = {
     login: {
       title: 'Entrar na plataforma',
@@ -110,13 +153,15 @@ export default function LoginPage() {
 
   const currentMode = modeConfig[mode];
 
+  // ── RENDER ──────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-      {/* Decorative Blur Orbs */}
+      {/* Fundo decorativo: círculos com blur (efeito glassmorphism) */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl" />
 
-      {/* Back to Home */}
+      {/* Botão Voltar para a landing page */}
       <div className="absolute top-6 left-6 z-10">
         <Link href="/">
           <Button variant="ghost" className="gap-2 group text-slate-400 hover:text-white">
@@ -126,13 +171,14 @@ export default function LoginPage() {
         </Link>
       </div>
 
+      {/* Card do formulário com animação de entrada */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
         className="w-full max-w-[420px] z-10"
       >
-        {/* Logo */}
+        {/* Logo + nome do ERP */}
         <div className="mb-8 flex flex-col items-center text-center">
           <motion.div
             initial={{ scale: 0.8 }}
@@ -154,13 +200,15 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit(onSubmit)}>
             <CardContent className="space-y-4">
-              {/* Error/Success messages */}
+              {/* Alerta de erro (ex: email ou senha incorretos) */}
               {error && (
                 <div className="flex items-center gap-2.5 bg-rose-900/30 border border-rose-500/30 text-rose-400 text-sm font-medium rounded-lg p-3.5">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
+
+              {/* Alerta de sucesso (ex: conta criada, email enviado) */}
               {success && (
                 <div className="flex items-center gap-2.5 bg-emerald-900/30 border border-emerald-500/30 text-emerald-400 text-sm font-medium rounded-lg p-3.5">
                   <CheckCircle className="h-4 w-4 shrink-0" />
@@ -168,7 +216,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Email */}
+              {/* Campo: Email */}
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-slate-300 text-sm">Email corporativo</Label>
                 <Input
@@ -184,7 +232,7 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {/* Password (hidden on forgot mode) */}
+              {/* Campo: Senha (oculto no modo "esqueci a senha") */}
               {mode !== 'forgot' && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -208,6 +256,7 @@ export default function LoginPage() {
                       {...register('password')}
                       className={`bg-slate-800/80 border-slate-700 text-white placeholder:text-slate-600 pr-10 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 ${errors.password ? 'border-rose-500' : ''}`}
                     />
+                    {/* Botão para alternar visibilidade da senha (ícone de olho) */}
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
@@ -224,6 +273,7 @@ export default function LoginPage() {
             </CardContent>
 
             <CardFooter className="flex-col gap-4 pt-2">
+              {/* Botão principal (Entrar / Criar conta / Enviar link) */}
               <Button
                 type="submit"
                 className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-600/20 py-5 transition-all"
@@ -237,7 +287,7 @@ export default function LoginPage() {
                 ) : currentMode.button}
               </Button>
 
-              {/* Mode toggle */}
+              {/* Link para alternar entre Login / Registro / Recuperação */}
               <p className="text-sm text-slate-500 text-center">
                 {currentMode.toggle.text}{' '}
                 <button
@@ -252,6 +302,7 @@ export default function LoginPage() {
           </form>
         </Card>
 
+        {/* Termos de serviço (apenas decorativo) */}
         <p className="mt-8 text-center text-xs text-slate-600 leading-relaxed">
           Ao continuar, você concorda com nossos{' '}
           <a href="#" className="underline underline-offset-2 hover:text-slate-400">Termos de Serviço</a>

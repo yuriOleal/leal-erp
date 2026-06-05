@@ -1,3 +1,20 @@
+// ================================================================
+// PRODUCT MODAL — Modal de Criar/Editar Produto
+//
+// Permite cadastrar um novo produto no catálogo ou editar um existente.
+//
+// Campos do formulário:
+// - Nome do produto
+// - SKU (código interno único por usuário)
+// - Categoria (ex: Eletrônicos, Móveis, Acessórios)
+// - Fornecedor
+// - Preço de Custo (quanto você pagou)
+// - Preço de Venda (quanto você cobra — DEVE ser > preço de custo)
+// - Estoque Inicial (quantidade em unidades)
+//
+// Validação: productSchema (Zod) — garante que preço de venda > preço de custo
+// ================================================================
+
 'use client';
 
 import { useEffect } from 'react';
@@ -6,12 +23,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { productSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
 import { Product } from '@/types';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,9 +37,10 @@ import { Label } from '@/components/ui/label';
 interface ProductModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  productToEdit?: Product | null;
+  productToEdit?: Product | null; // null = modo criação, objeto = modo edição
 }
 
+// remove 'id' pois é gerado automaticamente pelo banco
 type ProductFormValues = Omit<Product, 'id'>;
 
 export function ProductModal({ open, onOpenChange, productToEdit }: ProductModalProps) {
@@ -32,7 +50,6 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
     register,
     handleSubmit,
     reset,
-    setValue,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -47,10 +64,11 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
     },
   });
 
-  // Reset form when modal opens/closes or changes edit target
+  // Preenche ou limpa o formulário quando o modal abre
   useEffect(() => {
     if (open) {
       if (productToEdit) {
+        // Modo EDIÇÃO: carrega dados do produto existente
         reset({
           name: productToEdit.name,
           sku: productToEdit.sku,
@@ -61,14 +79,10 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
           supplier: productToEdit.supplier,
         });
       } else {
+        // Modo CRIAÇÃO: formulário em branco
         reset({
-          name: '',
-          sku: '',
-          category: '',
-          purchasePrice: 0,
-          salePrice: 0,
-          stock: 0,
-          supplier: '',
+          name: '', sku: '', category: '',
+          purchasePrice: 0, salePrice: 0, stock: 0, supplier: '',
         });
       }
     }
@@ -76,9 +90,9 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
 
   const onSubmit = (data: ProductFormValues) => {
     if (productToEdit) {
-      updateProduct(productToEdit.id, data);
+      updateProduct(productToEdit.id, data);  // Atualiza existente
     } else {
-      addProduct(data);
+      addProduct(data);                        // Insere novo
     }
     onOpenChange(false);
   };
@@ -89,7 +103,9 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
         <DialogHeader>
           <DialogTitle>{productToEdit ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+          {/* Linha 1: Nome e SKU */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="name">Nome do Produto</Label>
@@ -108,6 +124,7 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
             </div>
           </div>
 
+          {/* Linha 2: Categoria e Fornecedor */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="category">Categoria</Label>
@@ -126,15 +143,16 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
             </div>
           </div>
 
+          {/* Linha 3: Preço de Custo, Preço de Venda e Estoque */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label htmlFor="purchasePrice">Preço de Custo (R$)</Label>
-              <Input 
-                id="purchasePrice" 
-                type="number" 
-                step="0.01" 
-                placeholder="0.00" 
-                {...register('purchasePrice', { valueAsNumber: true })} 
+              <Input
+                id="purchasePrice"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                {...register('purchasePrice', { valueAsNumber: true })}
               />
               {errors.purchasePrice && (
                 <p className="text-xs font-semibold text-destructive">{errors.purchasePrice.message}</p>
@@ -143,12 +161,12 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
 
             <div className="space-y-1">
               <Label htmlFor="salePrice">Preço de Venda (R$)</Label>
-              <Input 
-                id="salePrice" 
-                type="number" 
-                step="0.01" 
-                placeholder="0.00" 
-                {...register('salePrice', { valueAsNumber: true })} 
+              <Input
+                id="salePrice"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                {...register('salePrice', { valueAsNumber: true })}
               />
               {errors.salePrice && (
                 <p className="text-xs font-semibold text-destructive">{errors.salePrice.message}</p>
@@ -157,11 +175,11 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
 
             <div className="space-y-1">
               <Label htmlFor="stock">Estoque Inicial</Label>
-              <Input 
-                id="stock" 
-                type="number" 
-                placeholder="0" 
-                {...register('stock', { valueAsNumber: true })} 
+              <Input
+                id="stock"
+                type="number"
+                placeholder="0"
+                {...register('stock', { valueAsNumber: true })}
               />
               {errors.stock && (
                 <p className="text-xs font-semibold text-destructive">{errors.stock.message}</p>
@@ -169,6 +187,7 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
             </div>
           </div>
 
+          {/* Botões */}
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar

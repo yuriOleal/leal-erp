@@ -1,3 +1,17 @@
+// ================================================================
+// CLIENT MODAL — Modal de Criar/Editar Cliente
+//
+// Abre como um dialog (popup centralizado) quando o usuário clica
+// em "Novo Cliente" ou no ícone de editar na tabela de clientes.
+//
+// Modos de operação:
+// - Criação: clientToEdit = null  → formulário em branco
+// - Edição:   clientToEdit = {...} → formulário preenchido com dados existentes
+//
+// Validação: React Hook Form + Zod (clientSchema)
+// Persistência: AppContext → Supabase
+// ================================================================
+
 'use client';
 
 import { useEffect } from 'react';
@@ -6,35 +20,41 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { clientSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
 import { Client } from '@/types';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+// ─── TIPOS ────────────────────────────────────────────────────────
+
 interface ClientModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  clientToEdit?: Client | null;
+  open: boolean;            // Controla se o modal está visível
+  onOpenChange: (open: boolean) => void; // Callback para abrir/fechar
+  clientToEdit?: Client | null; // Se fornecido, é modo EDIÇÃO; se null/undefined, é CRIAÇÃO
 }
 
+// O formulário NÃO inclui 'id' nem 'createdAt' — são gerados pelo banco
 type ClientFormValues = Omit<Client, 'id' | 'createdAt'>;
 
-export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalProps) {
-  const { addClient, updateClient } = useApp();
+// ─── COMPONENTE ───────────────────────────────────────────────────
 
+export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalProps) {
+  const { addClient, updateClient } = useApp(); // Funções CRUD do contexto
+
+  // ── Configuração do React Hook Form ──
   const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
+    register,           // Registra cada input no form
+    handleSubmit,       // Handler que executa validação antes de onSubmit
+    reset,              // Reseta o formulário para valores iniciais
+    formState: { errors }, // Erros de validação do Zod
   } = useForm<ClientFormValues>({
-    resolver: zodResolver(clientSchema),
+    resolver: zodResolver(clientSchema), // Valida com o schema Zod
     defaultValues: {
       name: '',
       document: '',
@@ -44,10 +64,13 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
     },
   });
 
-  // Reset form when modal opens/closes or changes edit target
+  // ── Efeito: preenche o form quando o modal abre ──
+  // Se for edição → carrega dados do cliente
+  // Se for criação → limpa o formulário
   useEffect(() => {
     if (open) {
       if (clientToEdit) {
+        // Modo EDIÇÃO: preenche com os dados do cliente selecionado
         reset({
           name: clientToEdit.name,
           document: clientToEdit.document,
@@ -56,6 +79,7 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
           address: clientToEdit.address,
         });
       } else {
+        // Modo CRIAÇÃO: limpa todos os campos
         reset({
           name: '',
           document: '',
@@ -67,22 +91,30 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
     }
   }, [open, clientToEdit, reset]);
 
+  // ── Handler de submit ──
   const onSubmit = (data: ClientFormValues) => {
     if (clientToEdit) {
+      // Modo EDIÇÃO: atualiza cliente existente
       updateClient(clientToEdit.id, data);
     } else {
+      // Modo CRIAÇÃO: insere novo cliente
       addClient(data);
     }
-    onOpenChange(false);
+    onOpenChange(false); // Fecha o modal
   };
 
+  // ── RENDER ──
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{clientToEdit ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
+          <DialogTitle>
+            {clientToEdit ? 'Editar Cliente' : 'Novo Cliente'}
+          </DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+          {/* Campo: Nome / Razão Social */}
           <div className="space-y-1">
             <Label htmlFor="name">Nome / Razão Social</Label>
             <Input id="name" placeholder="Ex: Tech Solutions Ltda" {...register('name')} />
@@ -91,6 +123,7 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
             )}
           </div>
 
+          {/* Linha com 2 colunas: CPF/CNPJ e Telefone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="document">CPF ou CNPJ</Label>
@@ -109,6 +142,7 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
             </div>
           </div>
 
+          {/* Campo: Email */}
           <div className="space-y-1">
             <Label htmlFor="email">Email de Contato</Label>
             <Input id="email" type="email" placeholder="financeiro@empresa.com" {...register('email')} />
@@ -117,6 +151,7 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
             )}
           </div>
 
+          {/* Campo: Endereço */}
           <div className="space-y-1">
             <Label htmlFor="address">Endereço Completo</Label>
             <Input id="address" placeholder="Av. Paulista, 1000 - São Paulo, SP" {...register('address')} />
@@ -125,6 +160,7 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
             )}
           </div>
 
+          {/* Botões: Cancelar | Salvar */}
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar

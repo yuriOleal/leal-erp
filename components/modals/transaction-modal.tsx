@@ -1,3 +1,18 @@
+// ================================================================
+// TRANSACTION MODAL — Modal de Lançamento Financeiro
+//
+// Permite registrar uma entrada (receita) ou saída (despesa) no fluxo
+// de caixa. O usuário escolhe:
+// - Tipo: Receita (income) ou Despesa (expense)
+// - Valor em reais
+// - Descrição (ex: "Pagamento de fornecedor")
+// - Categoria (varia conforme o tipo selecionado)
+//
+// As categorias mudam dinamicamente:
+// - Receitas: Vendas, Serviços, Investimentos, Outros
+// - Despesas: Aluguel, RH, Contas Fixas, Marketing, Logística, Outros
+// ================================================================
+
 'use client';
 
 import { useEffect } from 'react';
@@ -5,12 +20,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { transactionSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,9 +43,10 @@ type TransactionFormValues = {
   category: string;
 };
 
+// Categorias disponíveis separadas por tipo de transação
 const CATEGORIES = {
   income: ['Vendas', 'Serviços', 'Investimentos', 'Outros'],
-  expense: ['Aluguel', 'Rh', 'Contas Fixas', 'Marketing', 'Logística', 'Outros']
+  expense: ['Aluguel', 'RH', 'Contas Fixas', 'Marketing', 'Logística', 'Outros']
 };
 
 export function TransactionModal({ open, onOpenChange }: TransactionModalProps) {
@@ -40,8 +56,8 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
+    watch,       // Observa o valor atual de um campo (reativo)
+    setValue,    // Define o valor de um campo programaticamente
     formState: { errors },
   } = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -53,21 +69,17 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
     },
   });
 
-  const watchedType = watch('type');
+  const watchedType = watch('type'); // Observa mudanças no tipo (income/expense)
 
-  // Reset form when modal opens
+  // Reseta o formulário quando o modal abre
   useEffect(() => {
     if (open) {
-      reset({
-        type: 'income',
-        amount: 0,
-        description: '',
-        category: '',
-      });
+      reset({ type: 'income', amount: 0, description: '', category: '' });
     }
   }, [open, reset]);
 
-  // Adjust category if type changes
+  // Quando o usuário muda o tipo (receita ↔ despesa), limpa a categoria
+  // porque as opções de categoria são diferentes para cada tipo
   useEffect(() => {
     setValue('category', '');
   }, [watchedType, setValue]);
@@ -83,9 +95,9 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
         <DialogHeader>
           <DialogTitle>Registrar Lançamento Financeiro</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
-          
-          {/* Type Selection */}
+          {/* Tipo: Receita ou Despesa */}
           <div className="space-y-1">
             <Label htmlFor="type">Tipo de Lançamento</Label>
             <select
@@ -98,22 +110,22 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
             </select>
           </div>
 
-          {/* Amount */}
+          {/* Valor em reais */}
           <div className="space-y-1">
             <Label htmlFor="amount">Valor (R$)</Label>
-            <Input 
-              id="amount" 
-              type="number" 
-              step="0.01" 
-              placeholder="0.00" 
-              {...register('amount', { valueAsNumber: true })} 
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              {...register('amount', { valueAsNumber: true })}
             />
             {errors.amount && (
               <p className="text-xs font-semibold text-destructive">{errors.amount.message}</p>
             )}
           </div>
 
-          {/* Description */}
+          {/* Descrição do lançamento */}
           <div className="space-y-1">
             <Label htmlFor="description">Descrição</Label>
             <Input id="description" placeholder="Ex: Licença mensal de software" {...register('description')} />
@@ -122,7 +134,7 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
             )}
           </div>
 
-          {/* Category */}
+          {/* Categoria (opções mudam conforme o tipo selecionado) */}
           <div className="space-y-1">
             <Label htmlFor="category">Categoria</Label>
             <select
@@ -140,6 +152,7 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
             )}
           </div>
 
+          {/* Botões */}
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
