@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApp } from '@/lib/context/AppContext';
-import { TrendingUp, TrendingDown, DollarSign, Wallet, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Wallet, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TransactionModal } from '@/components/modals/transaction-modal';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function FinanceiroPage() {
-  const { transactions } = useApp();
+  const { transactions, deleteTransaction } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -26,6 +28,13 @@ export default function FinanceiroPage() {
 
   const balance = totalIncome - totalExpense;
 
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este lançamento financeiro?')) return;
+
+    const result = await deleteTransaction(id);
+    setErrorMsg(result.error);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -37,6 +46,12 @@ export default function FinanceiroPage() {
           <Plus className="mr-2 h-4 w-4" /> Registrar Lançamento
         </Button>
       </div>
+
+      {errorMsg && (
+        <p className="rounded-md bg-destructive/10 p-3 text-sm font-medium text-destructive">
+          {errorMsg}
+        </p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -58,7 +73,7 @@ export default function FinanceiroPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalIncome)}</div>
-            <p className="text-xs text-muted-foreground">+12% em relação ao último mês</p>
+            <p className="text-xs text-muted-foreground">Total de entradas registradas</p>
           </CardContent>
         </Card>
         <Card>
@@ -68,7 +83,7 @@ export default function FinanceiroPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">{formatCurrency(totalExpense)}</div>
-            <p className="text-xs text-muted-foreground">-2% em relação ao último mês</p>
+            <p className="text-xs text-muted-foreground">Total de saídas registradas</p>
           </CardContent>
         </Card>
         <Card>
@@ -96,6 +111,7 @@ export default function FinanceiroPage() {
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -107,11 +123,25 @@ export default function FinanceiroPage() {
                   <TableCell className={`text-right font-semibold ${tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                     {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground">
+                        <span className="sr-only">Abrir menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDeleteTransaction(tx.id)} className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
               ))}
               {transactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                     Nenhum lançamento financeiro registrado.
                   </TableCell>
                 </TableRow>

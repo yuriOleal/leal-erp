@@ -16,7 +16,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { transactionSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
@@ -56,8 +56,8 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
     register,
     handleSubmit,
     reset,
-    watch,       // Observa o valor atual de um campo (reativo)
     setValue,    // Define o valor de um campo programaticamente
+    control,
     formState: { errors },
   } = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -69,7 +69,7 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
     },
   });
 
-  const watchedType = watch('type'); // Observa mudanças no tipo (income/expense)
+  const watchedType = useWatch({ control, name: 'type' }); // Observa mudanças no tipo (income/expense)
 
   // Reseta o formulário quando o modal abre
   useEffect(() => {

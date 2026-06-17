@@ -6,14 +6,17 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApp } from '@/lib/context/AppContext';
+import { Sale } from '@/types';
 import { Search, Plus, MoreHorizontal, FileText, CheckCircle, Clock } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SaleModal } from '@/components/modals/sale-modal';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function VendasPage() {
   const { sales } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
   const filteredSales = sales.filter(s => 
     s.clientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -82,10 +85,7 @@ export default function VendasPage() {
                         <MoreHorizontal className="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => {
-                          const items = sale.products.map(p => `${p.quantity}x ${p.name} (R$ ${p.price.toFixed(2)})`).join('\n');
-                          alert(`Produtos nesta venda:\n${items}`);
-                        }}>
+                        <DropdownMenuItem onClick={() => setSelectedSale(sale)}>
                           <FileText className="mr-2 h-4 w-4" />
                           Ver Detalhes
                         </DropdownMenuItem>
@@ -110,6 +110,47 @@ export default function VendasPage() {
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
       />
+
+      <Dialog open={Boolean(selectedSale)} onOpenChange={(open) => !open && setSelectedSale(null)}>
+        <DialogContent className="sm:max-w-[620px]">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Venda #{selectedSale?.id}</DialogTitle>
+            <DialogDescription>
+              {selectedSale?.clientName} | {selectedSale ? new Date(selectedSale.date).toLocaleDateString('pt-BR') : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-center">Qtd</TableHead>
+                  <TableHead className="text-right">Preço</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedSale?.products.map((product, index) => (
+                  <TableRow key={`${product.productId}-${index}`}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="text-center">{product.quantity}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(product.quantity * product.price)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg bg-muted/40 p-4 font-bold">
+            <span>Total da venda</span>
+            <span>{selectedSale ? formatCurrency(selectedSale.total) : formatCurrency(0)}</span>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

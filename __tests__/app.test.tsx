@@ -39,7 +39,7 @@ describe('Suíte de Validação de Regras de Negócio (Zod Schemas)', () => {
     it('deve validar um cliente com CNPJ correto', () => {
       const result = clientSchema.safeParse({
         name: 'Empresa Teste Ltda',
-        document: '12.345.678/0001-90',
+        document: '11.222.333/0001-81',
         phone: '11987654321',
         email: 'financeiro@empresateste.com',
         address: 'Rua das Flores, 123',
@@ -57,8 +57,20 @@ describe('Suíte de Validação de Regras de Negócio (Zod Schemas)', () => {
       });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Insira um CPF (11 dígitos) ou CNPJ (14 dígitos) válido');
+        expect(result.error.issues[0].message).toBe('Insira um CPF ou CNPJ válido');
       }
+    });
+
+    it('deve falhar se o CPF/CNPJ tiver formato correto mas dígitos inválidos', () => {
+      const result = clientSchema.safeParse({
+        name: 'Empresa Teste Ltda',
+        document: '11.111.111/1111-11',
+        phone: '11987654321',
+        email: 'financeiro@empresateste.com',
+        address: 'Rua das Flores, 123',
+      });
+
+      expect(result.success).toBe(false);
     });
   });
 

@@ -14,7 +14,7 @@
 //
 // CARACTERÍSTICAS:
 // - useFieldArray: permite adicionar/remover linhas de produtos dinamicamente
-// - Cálculo de total em tempo real (watch + useEffect)
+// - Cálculo de total em tempo real (useWatch + useEffect)
 // - Validação de estoque em duas camadas (frontend + RPC no banco)
 // - Preço do produto é preenchido automaticamente ao selecionar
 // ================================================================
@@ -22,7 +22,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { saleSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
@@ -67,7 +67,6 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
     register,
     handleSubmit,
     control,      // Necessário para useFieldArray
-    watch,        // Observa valores em tempo real (reativo)
     setValue,     // Define valores programaticamente
     reset,        // Reseta o formulário
     formState: { errors },
@@ -89,8 +88,9 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   });
 
   // Observa mudanças em tempo real
-  const watchedProducts = watch('products');
-  const watchedClientId = watch('clientId');
+  const watchedProducts = useWatch({ control, name: 'products' });
+  const watchedClientId = useWatch({ control, name: 'clientId' });
+  const watchedTotal = useWatch({ control, name: 'total' });
 
   // ── Efeito: Auto-preenche nome do cliente ao selecionar ──
   useEffect(() => {
@@ -128,9 +128,13 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
         status: 'completed',
         total: 0,
       });
-      setErrorMsg(null);
     }
   }, [open, reset]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setErrorMsg(null);
+    onOpenChange(nextOpen);
+  };
 
   // ── Handler: Ao selecionar um produto no dropdown ──
   // Preenche automaticamente nome e preço de venda
@@ -182,7 +186,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
 
   // ── RENDER ──
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Registrar Nova Venda</DialogTitle>
@@ -249,9 +253,10 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
 
             <div className="space-y-3">
               {fields.map((field, index) => {
-                const currentProductId = watch(`products.${index}.productId`);
-                const productDb = dbProducts.find(p => p.id === currentProductId);
-                const stockLeft = productDb ? productDb.stock : 0;
+                const currentProduct = watchedProducts?.[index];
+                const currentProductId = currentProduct?.productId ?? '';
+                const quantity = currentProduct?.quantity || 0;
+                const price = currentProduct?.price || 0;
 
                 return (
                   <div key={field.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-muted/40 p-3 rounded-lg border border-border/50">
@@ -299,7 +304,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
                     {/* Subtotal da linha + botão remover */}
                     <div className="flex items-center justify-between w-full sm:w-auto gap-4 sm:pl-2">
                       <span className="text-xs font-bold whitespace-nowrap min-w-[70px] text-right">
-                        R$ {((watch(`products.${index}.quantity`) || 0) * (watch(`products.${index}.price`) || 0)).toFixed(2)}
+                        R$ {(quantity * price).toFixed(2)}
                       </span>
 
                       {/* Botão remover (só aparece se tiver mais de 1 linha) */}
@@ -329,7 +334,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
           <div className="flex justify-between items-center text-lg font-bold bg-muted/20 p-4 rounded-lg">
             <span>Total Geral:</span>
             <span className="text-indigo-600 dark:text-indigo-400">
-              R$ {watch('total')?.toFixed(2) || '0.00'}
+              R$ {watchedTotal?.toFixed(2) || '0.00'}
             </span>
           </div>
 

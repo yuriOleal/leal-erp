@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useApp } from '@/lib/context/AppContext';
 import { 
   Card, 
@@ -9,17 +10,14 @@ import {
   CardDescription
 } from '@/components/ui/card';
 import { Users, Package, ShoppingCart, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
+
+const DashboardChart = dynamic(
+  () => import('@/components/dashboard-chart').then(module => module.DashboardChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full rounded-md bg-muted/40" />,
+  }
+);
 
 export default function DashboardPage() {
   const { products, sales, transactions, stats } = useApp();
@@ -68,19 +66,6 @@ export default function DashboardPage() {
       }
     });
 
-    // If all values are 0 (e.g. no transactions matching those months), fallback to visual defaults
-    const hasData = Object.values(monthlyData).some(d => d.revenue > 0 || d.expenses > 0);
-    if (!hasData) {
-      return [
-        { name: 'Jan', revenue: 65000, expenses: 40000 },
-        { name: 'Fev', revenue: 72000, expenses: 42000 },
-        { name: 'Mar', revenue: 90000, expenses: 45000 },
-        { name: 'Abr', revenue: 110000, expenses: 48000 },
-        { name: 'Mai', revenue: 142100, expenses: 50000 },
-        { name: 'Jun', revenue: stats.monthlyRevenue || 80000, expenses: 30000 },
-      ];
-    }
-
     return Object.entries(monthlyData).map(([name, data]) => ({
       name,
       revenue: data.revenue,
@@ -105,7 +90,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</div>
-            <p className="text-xs text-muted-foreground">+12% em relação ao mês anterior</p>
+            <p className="text-xs text-muted-foreground">Receitas registradas no período</p>
           </CardContent>
         </Card>
         <Card>
@@ -115,7 +100,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.estimatedProfit)}</div>
-            <p className="text-xs text-muted-foreground">+8.5% em relação ao mês anterior</p>
+            <p className="text-xs text-muted-foreground">Receitas menos despesas registradas</p>
           </CardContent>
         </Card>
         <Card>
@@ -125,7 +110,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalClients}</div>
-            <p className="text-xs text-muted-foreground">+2 novos nesta semana</p>
+            <p className="text-xs text-muted-foreground">Clientes cadastrados na conta</p>
           </CardContent>
         </Card>
         <Card>
@@ -150,16 +135,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value/1000}k`} />
-                  <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Bar dataKey="revenue" name="Receitas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <DashboardChart data={chartData} type="bar" />
             </div>
           </CardContent>
         </Card>
@@ -203,15 +179,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value/1000}k`} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Line type="monotone" dataKey="revenue" name="Saldo" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
+              <DashboardChart data={chartData} type="line" />
             </div>
           </CardContent>
         </Card>

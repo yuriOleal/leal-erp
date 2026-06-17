@@ -19,6 +19,48 @@ const documentRegex = /^\d{2,3}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$|^\d{3}\.?\d{3}\.
 // Regex para validar formato de telefone com DDD
 const phoneRegex = /^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/;
 
+// Remove tudo que não for número. CPF/CNPJ costumam chegar com pontos,
+// barras e hífens, mas a validação matemática precisa apenas dos dígitos.
+const onlyDigits = (value: string) => value.replace(/\D/g, '');
+
+// Validação completa de CPF, incluindo dígitos verificadores.
+// Isso evita aceitar documentos visualmente corretos, mas matematicamente inválidos.
+const isValidCpf = (document: string) => {
+  const cpf = onlyDigits(document);
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+
+  const calculateDigit = (factor: number) => {
+    const total = cpf
+      .slice(0, factor - 1)
+      .split('')
+      .reduce((sum, digit, index) => sum + Number(digit) * (factor - index), 0);
+    const remainder = (total * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return calculateDigit(10) === Number(cpf[9]) && calculateDigit(11) === Number(cpf[10]);
+};
+
+// Validação completa de CNPJ, incluindo dígitos verificadores.
+// O cálculo usa pesos diferentes para o primeiro e segundo dígito.
+const isValidCnpj = (document: string) => {
+  const cnpj = onlyDigits(document);
+  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
+
+  const calculateDigit = (base: string, weights: number[]) => {
+    const total = base
+      .split('')
+      .reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0);
+    const remainder = total % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const firstDigit = calculateDigit(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const secondDigit = calculateDigit(cnpj.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return firstDigit === Number(cnpj[12]) && secondDigit === Number(cnpj[13]);
+};
+
 // ─── SCHEMAS DE VALIDAÇÃO ────────────────────────────────────────
 
 /**
@@ -45,8 +87,8 @@ export const clientSchema = z.object({
 
   document: z.string()
     .refine(
-      (doc) => documentRegex.test(doc.replace(/[^\d]/g, '')) || doc.length >= 11,
-      'Insira um CPF (11 dígitos) ou CNPJ (14 dígitos) válido'
+      (doc) => documentRegex.test(doc) && (isValidCpf(doc) || isValidCnpj(doc)),
+      'Insira um CPF ou CNPJ válido'
     ),
 
   phone: z.string()

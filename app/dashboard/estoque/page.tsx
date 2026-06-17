@@ -30,7 +30,7 @@ export default function EstoquePage() {
     setIsAdjustOpen(true);
   };
 
-  const handleAdjustStock = (e: React.FormEvent) => {
+  const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -61,17 +61,27 @@ export default function EstoquePage() {
       : product.stock - adjustQty;
 
     // Update Product Stock
-    updateProduct(product.id, { stock: newStock });
+    const stockResult = await updateProduct(product.id, { stock: newStock });
+    if (stockResult.error) {
+      setErrorMsg(stockResult.error);
+      return;
+    }
 
     // Register financial transaction if it is an Entry (restocking/purchasing represents an expense)
     if (adjustType === 'in') {
       const cost = product.purchasePrice * adjustQty;
-      addTransaction({
+      const transactionResult = await addTransaction({
         type: 'expense',
         amount: cost,
         description: `Compra de estoque: ${adjustQty}x ${product.name}`,
         category: 'Logística'
       });
+
+      if (transactionResult.error) {
+        await updateProduct(product.id, { stock: product.stock });
+        setErrorMsg(transactionResult.error);
+        return;
+      }
     } else {
       // Out adjustment can be a waste/write-off (zero income) or standard sale (normally managed by Sales module)
     }

@@ -2,7 +2,7 @@
 // NAVBAR — Barra superior do dashboard
 //
 // Contém:
-// - Campo de busca global (placeholder)
+// - Campo de busca global por módulos do sistema
 // - Botão de alternar tema (claro/escuro)
 // - Ícone de notificações com indicador
 // - Botão rápido "Nova Venda"
@@ -11,6 +11,7 @@
 
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Button } from './ui/button';
 import { Search, Bell, Moon, Sun, User, LogOut } from 'lucide-react';
@@ -28,10 +29,41 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context/AppContext';
 
+const searchableRoutes = [
+  { label: 'Dashboard', href: '/dashboard', keywords: 'inicio painel métricas indicadores' },
+  { label: 'Clientes', href: '/dashboard/clientes', keywords: 'cliente cpf cnpj contato carteira' },
+  { label: 'Produtos', href: '/dashboard/produtos', keywords: 'produto sku catalogo preço' },
+  { label: 'Estoque', href: '/dashboard/estoque', keywords: 'estoque inventario entrada saída reposição' },
+  { label: 'Vendas', href: '/dashboard/vendas', keywords: 'venda pdv pedido orçamento' },
+  { label: 'Financeiro', href: '/dashboard/financeiro', keywords: 'financeiro caixa receita despesa lançamento' },
+  { label: 'Relatórios', href: '/dashboard/relatorios', keywords: 'relatorio csv pdf exportar imprimir' },
+  { label: 'Configurações', href: '/dashboard/configuracoes', keywords: 'configuração perfil senha tema conta' },
+];
+
 export function Navbar() {
   const { setTheme, theme } = useTheme(); // Controle de tema (next-themes)
   const router = useRouter();
   const { user, signOut } = useApp();     // Dados do usuário + função de logout
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Busca local por módulos. É propositalmente simples: evita API extra,
+  // funciona offline e resolve o uso principal da navbar neste estágio.
+  const searchResults = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return [];
+
+    return searchableRoutes.filter(route =>
+      `${route.label} ${route.keywords}`.toLowerCase().includes(query)
+    );
+  }, [searchTerm]);
+
+  const goToFirstResult = () => {
+    const [firstResult] = searchResults;
+    if (!firstResult) return;
+
+    setSearchTerm('');
+    router.push(firstResult.href);
+  };
 
   // ── Logout: limpa a sessão e redireciona para o login ──
   const handleLogout = async () => {
@@ -55,7 +87,30 @@ export function Navbar() {
             type="text"
             placeholder="Busca global..."
             className="pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border-border rounded-lg text-sm w-80 focus-visible:ring-primary/20 h-9"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') goToFirstResult();
+              if (event.key === 'Escape') setSearchTerm('');
+            }}
           />
+          {searchResults.length > 0 && (
+            <div className="absolute left-0 top-11 z-50 w-80 rounded-lg border bg-popover p-1 text-sm shadow-lg">
+              {searchResults.map(result => (
+                <button
+                  key={result.href}
+                  type="button"
+                  className="flex w-full items-center rounded-md px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    setSearchTerm('');
+                    router.push(result.href);
+                  }}
+                >
+                  {result.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
