@@ -11,6 +11,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
+import { formatCompactCurrency, formatCurrency } from '@/lib/formatters';
 
 type ChartDataPoint = {
   name: string;
@@ -23,19 +24,66 @@ interface DashboardChartProps {
   type: 'bar' | 'line';
 }
 
+const tooltipStyle = {
+  borderRadius: '16px',
+  border: '1px solid var(--border)',
+  boxShadow: '0 18px 45px rgb(15 23 42 / 0.12)',
+  background: 'var(--card)',
+  color: 'var(--card-foreground)',
+};
+
 // Componente isolado para os gráficos do dashboard.
 // Ele é carregado dinamicamente sem SSR, porque o Recharts depende do tamanho
 // real do container no navegador e costuma gerar avisos durante o build estático.
 export function DashboardChart({ data, type }: DashboardChartProps) {
+  const commonAxisProps = {
+    axisLine: false,
+    tickLine: false,
+    tick: { fill: 'var(--muted-foreground)', fontSize: 12 },
+  };
+
+  const tooltipFormatter = (value: unknown, name: unknown) => {
+    const labels: Record<string, string> = {
+      revenue: 'Receitas',
+      expenses: 'Despesas',
+    };
+
+    return [
+      formatCurrency(Number(value ?? 0)),
+      labels[String(name)] ?? 'Saldo',
+    ] as [string, string];
+  };
+
   if (type === 'line') {
+    const lineData = data.map(item => ({
+      ...item,
+      balance: item.revenue - item.expenses,
+    }));
+
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" axisLine={false} tickLine={false} />
-          <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value / 1000}k`} />
-          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-          <Line type="monotone" dataKey="revenue" name="Saldo" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+        <LineChart data={lineData} margin={{ top: 16, right: 18, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="var(--border)" strokeDasharray="4 8" vertical={false} />
+          <XAxis dataKey="name" {...commonAxisProps} />
+          <YAxis
+            {...commonAxisProps}
+            width={72}
+            tickFormatter={(value) => formatCompactCurrency(Number(value))}
+          />
+          <RechartsTooltip
+            contentStyle={tooltipStyle}
+            cursor={{ stroke: 'var(--primary)', strokeDasharray: '4 4' }}
+            formatter={(value) => [formatCurrency(Number(value)), 'Saldo']}
+          />
+          <Line
+            type="monotone"
+            dataKey="balance"
+            name="Saldo"
+            stroke="var(--primary)"
+            strokeWidth={3}
+            dot={{ r: 4, strokeWidth: 2, fill: 'var(--card)' }}
+            activeDot={{ r: 7, strokeWidth: 2 }}
+          />
         </LineChart>
       </ResponsiveContainer>
     );
@@ -43,13 +91,21 @@ export function DashboardChart({ data, type }: DashboardChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="name" axisLine={false} tickLine={false} />
-        <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value / 1000}k`} />
-        <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-        <Bar dataKey="revenue" name="Receitas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="expenses" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+      <BarChart data={data} margin={{ top: 16, right: 18, left: 0, bottom: 0 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="4 8" vertical={false} />
+        <XAxis dataKey="name" {...commonAxisProps} />
+        <YAxis
+          {...commonAxisProps}
+          width={72}
+          tickFormatter={(value) => formatCompactCurrency(Number(value))}
+        />
+        <RechartsTooltip
+          cursor={{ fill: 'var(--muted)', opacity: 0.35 }}
+          contentStyle={tooltipStyle}
+          formatter={tooltipFormatter}
+        />
+        <Bar dataKey="revenue" name="Receitas" fill="var(--primary)" radius={[8, 8, 0, 0]} />
+        <Bar dataKey="expenses" name="Despesas" fill="var(--chart-2)" radius={[8, 8, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

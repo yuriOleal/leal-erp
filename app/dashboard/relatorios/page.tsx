@@ -3,15 +3,25 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, Printer, FileSpreadsheet } from 'lucide-react';
+import { FileText, Download, Printer, FileSpreadsheet, BarChart3, Boxes, Users, WalletCards } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
+import { PageHeader } from '@/components/page-header';
+import { EmptyState } from '@/components/empty-state';
+import { formatCurrency } from '@/lib/formatters';
 
 type Report = {
-  id: string;
+  id: 'financeiro' | 'estoque' | 'vendas' | 'clientes';
   name: string;
   type: string;
-  lastGenerated: string;
+  description: string;
   rows: Record<string, string | number>[];
+};
+
+const reportIcons = {
+  financeiro: WalletCards,
+  estoque: Boxes,
+  vendas: BarChart3,
+  clientes: Users,
 };
 
 // Converte dados tabulares para CSV compatível com Excel/Sheets.
@@ -57,9 +67,6 @@ const escapeHtml = (value: string | number) =>
 export default function RelatoriosPage() {
   const { clients, products, sales, transactions } = useApp();
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-
   const reports: Report[] = useMemo(() => {
     const productRanking = products
       .map(product => {
@@ -84,7 +91,7 @@ export default function RelatoriosPage() {
         id: 'financeiro',
         name: 'Fechamento Financeiro',
         type: 'Financeiro',
-        lastGenerated: 'Agora',
+        description: 'Receitas, despesas, categorias e valores lançados.',
         rows: transactions.map(transaction => ({
           Data: transaction.date,
           Tipo: transaction.type === 'income' ? 'Receita' : 'Despesa',
@@ -97,7 +104,7 @@ export default function RelatoriosPage() {
         id: 'estoque',
         name: 'Posição de Estoque',
         type: 'Estoque',
-        lastGenerated: 'Agora',
+        description: 'SKU, fornecedor, custo, preço e quantidade atual.',
         rows: products.map(product => ({
           SKU: product.sku,
           Produto: product.name,
@@ -112,14 +119,14 @@ export default function RelatoriosPage() {
         id: 'vendas',
         name: 'Ranking de Vendas por Produto',
         type: 'Vendas',
-        lastGenerated: 'Agora',
+        description: 'Produtos ordenados por quantidade vendida.',
         rows: productRanking,
       },
       {
         id: 'clientes',
         name: 'Carteira de Clientes Ativos',
         type: 'Clientes',
-        lastGenerated: 'Agora',
+        description: 'Contatos, documentos e dados cadastrais.',
         rows: clients.map(client => ({
           Nome: client.name,
           Documento: client.document,
@@ -144,17 +151,19 @@ export default function RelatoriosPage() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>${report.name}</title>
+          <title>${escapeHtml(report.name)}</title>
           <style>
-            body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
-            h1 { font-size: 22px; margin-bottom: 4px; }
-            p { color: #6b7280; margin-top: 0; }
+            body { font-family: Arial, sans-serif; color: #102d27; padding: 28px; }
+            .brand { color: #64746f; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+            h1 { font-size: 24px; margin: 6px 0 4px; }
+            p { color: #5f6f6a; margin-top: 0; }
             table { border-collapse: collapse; width: 100%; margin-top: 24px; font-size: 12px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-            th { background: #f9fafb; }
+            th, td { border: 1px solid #dfe7e3; padding: 9px; text-align: left; }
+            th { background: #f5f1e8; color: #102d27; }
           </style>
         </head>
         <body>
+          <div class="brand">Leal ERP</div>
           <h1>${escapeHtml(report.name)}</h1>
           <p>Módulo: ${escapeHtml(report.type)} | Gerado: ${new Date().toLocaleString('pt-BR')}</p>
           <table>
@@ -170,52 +179,72 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Relatórios</h2>
-        <p className="text-muted-foreground">Exportação de dados e relatórios gerenciais</p>
-      </div>
+      <PageHeader
+        eyebrow="Inteligência"
+        title="Relatórios"
+        description="Exporte dados reais do ERP para CSV, impressão ou PDF sem depender de métricas fictícias."
+      />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {reports.map((report) => (
-          <Card key={report.id} className="hover:border-primary/50 transition-colors">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">{report.name}</CardTitle>
-                  <CardDescription>Módulo: {report.type}</CardDescription>
+      <div className="grid gap-5 md:grid-cols-2">
+        {reports.map((report) => {
+          const Icon = reportIcons[report.id];
+
+          return (
+            <Card
+              key={report.id}
+              className="group border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none"
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg">{report.name}</CardTitle>
+                    <CardDescription>{report.description}</CardDescription>
+                  </div>
+                  <div className="rounded-2xl bg-primary/10 p-3 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Icon className="h-5 w-5" />
+                  </div>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <FileText className="h-5 w-5" />
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2.5 py-1">Módulo: {report.type}</span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">{report.rows.length} registro(s)</span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">Gerado agora</span>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mt-4">
-                <span className="text-xs text-muted-foreground">
-                  {report.rows.length} registros | Gerado: {report.lastGenerated}
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="px-2" title="Imprimir" onClick={() => printReport(report)}>
+
+                {report.rows.length === 0 ? (
+                  <EmptyState
+                    icon={FileText}
+                    title="Relatório sem dados"
+                    description="Quando este módulo tiver registros, as opções de exportação ficarão mais úteis."
+                    className="rounded-2xl border bg-muted/30 py-6"
+                  />
+                ) : null}
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" size="sm" title="Imprimir" onClick={() => printReport(report)}>
                     <Printer className="h-4 w-4" />
+                    Imprimir
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="px-2"
                     title="Exportar CSV"
                     onClick={() => downloadCsv(`leal-erp-${report.id}.csv`, report.rows)}
                     disabled={report.rows.length === 0}
                   >
                     <FileSpreadsheet className="h-4 w-4" />
+                    CSV
                   </Button>
-                  <Button variant="default" size="sm" className="px-2" title="Salvar como PDF" onClick={() => printReport(report)}>
-                    <Download className="h-4 w-4 mr-1" /> PDF
+                  <Button size="sm" title="Salvar como PDF" onClick={() => printReport(report)}>
+                    <Download className="h-4 w-4" />
+                    PDF
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
