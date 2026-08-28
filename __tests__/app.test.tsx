@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { loginSchema, clientSchema, productSchema } from '@/lib/validations/schemas';
+import { loginSchema, clientSchema, productSchema, saleSchema } from '@/lib/validations/schemas';
+import { isInCurrentMonth } from '@/lib/formatters';
 
 describe('Suíte de Validação de Regras de Negócio (Zod Schemas)', () => {
   
@@ -115,6 +116,30 @@ describe('Suíte de Validação de Regras de Negócio (Zod Schemas)', () => {
         supplier: 'Dell Brasil',
       });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('Validação de Vendas', () => {
+    it('deve impedir o mesmo produto em mais de uma linha da venda', () => {
+      const result = saleSchema.safeParse({
+        clientId: 'cliente-1',
+        clientName: 'Cliente de teste',
+        status: 'completed',
+        total: 200,
+        products: [
+          { productId: 'produto-1', name: 'Produto A', quantity: 1, price: 100 },
+          { productId: 'produto-1', name: 'Produto A', quantity: 1, price: 100 },
+        ],
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('Indicadores por período', () => {
+    it('deve reconhecer uma data pertencente ao mês de referência', () => {
+      expect(isInCurrentMonth('2026-07-16', new Date('2026-07-01T12:00:00'))).toBe(true);
+      expect(isInCurrentMonth('2026-06-30', new Date('2026-07-01T12:00:00'))).toBe(false);
     });
   });
 });

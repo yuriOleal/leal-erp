@@ -199,4 +199,19 @@ export const saleSchema = z.object({
 
   total: z.number()
     .min(0.01),
+}).superRefine((sale, context) => {
+  const selectedProducts = new Set<string>();
+
+  sale.products.forEach((product, index) => {
+    if (!product.productId || selectedProducts.has(product.productId)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['products', index, 'productId'],
+        message: 'Cada produto pode aparecer apenas uma vez na venda',
+      });
+      return;
+    }
+
+    selectedProducts.add(product.productId);
+  });
 });

@@ -15,7 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { formatCurrency } from '@/lib/formatters';
 
 export default function EstoquePage() {
-  const { products, updateProduct, addTransaction } = useApp();
+  const { products, adjustStock } = useApp();
 
   const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [adjustType, setAdjustType] = useState<'in' | 'out'>('in');
@@ -78,32 +78,12 @@ export default function EstoquePage() {
       return;
     }
 
-    const newStock = adjustType === 'in'
-      ? product.stock + adjustQty
-      : product.stock - adjustQty;
-
-    const stockResult = await updateProduct(product.id, { stock: newStock });
-    if (stockResult.error) {
-      setErrorMsg(stockResult.error);
+    // O banco atualiza estoque, histórico e (na entrada) financeiro dentro da
+    // mesma transação. Assim não existe risco de uma metade ser gravada.
+    const result = await adjustStock(product.id, adjustType, adjustQty);
+    if (result.error) {
+      setErrorMsg(result.error);
       return;
-    }
-
-    // Entrada manual representa compra/reposição; por isso registramos o custo
-    // como despesa financeira para manter estoque e caixa sincronizados.
-    if (adjustType === 'in') {
-      const cost = product.purchasePrice * adjustQty;
-      const transactionResult = await addTransaction({
-        type: 'expense',
-        amount: cost,
-        description: `Compra de estoque: ${adjustQty}x ${product.name}`,
-        category: 'Logística',
-      });
-
-      if (transactionResult.error) {
-        await updateProduct(product.id, { stock: product.stock });
-        setErrorMsg(transactionResult.error);
-        return;
-      }
     }
 
     setIsAdjustOpen(false);

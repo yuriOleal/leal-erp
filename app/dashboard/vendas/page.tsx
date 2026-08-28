@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,11 +17,14 @@ import { MetricCard } from '@/components/metric-card';
 import { EmptyState } from '@/components/empty-state';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 
-export default function VendasPage() {
-  const { sales } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
+function VendasPageContent() {
+  const { sales, completePendingSale } = useApp();
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('busca') ?? '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [completingSaleId, setCompletingSaleId] = useState<string | null>(null);
 
   const filteredSales = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -32,10 +36,26 @@ export default function VendasPage() {
     );
   }, [sales, searchTerm]);
 
-  const totalSalesAmount = sales.reduce((total, sale) => total + sale.total, 0);
-  const completedSales = sales.filter(sale => sale.status === 'completed').length;
+  const completedSalesList = sales.filter(sale => sale.status === 'completed');
+  const totalSalesAmount = completedSalesList.reduce((total, sale) => total + sale.total, 0);
+  const completedSales = completedSalesList.length;
   const pendingSales = sales.filter(sale => sale.status === 'pending').length;
-  const averageTicket = sales.length ? totalSalesAmount / sales.length : 0;
+  const averageTicket = completedSales ? totalSalesAmount / completedSales : 0;
+
+  const handleCompleteSale = async (sale: Sale) => {
+    if (!confirm(`Concluir o pedido #${sale.id.slice(0, 8).toUpperCase()}? O estoque e o financeiro serão atualizados.`)) {
+      return;
+    }
+
+    setErrorMsg(null);
+    setCompletingSaleId(sale.id);
+    try {
+      const result = await completePendingSale(sale.id);
+      if (result.error) setErrorMsg(result.error);
+    } finally {
+      setCompletingSaleId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -51,18 +71,24 @@ export default function VendasPage() {
         }
       />
 
+      {errorMsg && (
+        <p className="rounded-2xl bg-destructive/10 p-3 text-sm font-medium text-destructive">
+          {errorMsg}
+        </p>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Total vendido"
+          label="Faturado"
           value={formatCurrency(totalSalesAmount)}
-          description="Soma de todas as vendas registradas."
+          description="Soma dos pedidos concluídos."
           icon={WalletCards}
           tone="green"
         />
         <MetricCard
           label="Ticket médio"
           value={formatCurrency(averageTicket)}
-          description="Valor médio por pedido."
+          description="Média dos pedidos concluídos."
           icon={ReceiptText}
           tone="slate"
         />
@@ -138,6 +164,15 @@ export default function VendasPage() {
                           <FileText className="mr-2 h-4 w-4" />
                           Ver detalhes
                         </DropdownMenuItem>
+                        {sale.status === 'pending' && (
+                          <DropdownMenuItem
+                            onClick={() => handleCompleteSale(sale)}
+                            disabled={completingSaleId === sale.id}
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            {completingSaleId === sale.id ? 'Concluindo...' : 'Concluir pedido'}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -216,5 +251,13 @@ export default function VendasPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function VendasPage() {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/60" />}>
+      <VendasPageContent />
+    </Suspense>
   );
 }

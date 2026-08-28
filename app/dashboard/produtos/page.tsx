@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,11 +16,13 @@ import { MetricCard } from '@/components/metric-card';
 import { EmptyState } from '@/components/empty-state';
 import { formatCurrency } from '@/lib/formatters';
 
-export default function ProdutosPage() {
+function ProdutosPageContent() {
   const { products, deleteProduct } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('busca') ?? '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filteredProducts = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -50,10 +53,12 @@ export default function ProdutosPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteProduct = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este produto do catálogo?')) {
-      deleteProduct(id);
-    }
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este produto do catálogo?')) return;
+
+    setActionError(null);
+    const result = await deleteProduct(id);
+    if (result.error) setActionError(result.error);
   };
 
   const stockBadgeClass = (stock: number) => {
@@ -81,6 +86,10 @@ export default function ProdutosPage() {
           </Button>
         }
       />
+
+      {actionError && (
+        <p className="rounded-2xl bg-destructive/10 p-3 text-sm font-medium text-destructive">{actionError}</p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
@@ -204,5 +213,13 @@ export default function ProdutosPage() {
         productToEdit={productToEdit}
       />
     </div>
+  );
+}
+
+export default function ProdutosPage() {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/60" />}>
+      <ProdutosPageContent />
+    </Suspense>
   );
 }

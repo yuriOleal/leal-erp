@@ -30,22 +30,61 @@ const searchableRoutes = [
   { label: 'Configurações', href: '/dashboard/configuracoes', keywords: 'configuração perfil senha tema conta' },
 ];
 
+type SearchResult = {
+  label: string;
+  detail: string;
+  href: string;
+};
+
 export function Navbar() {
   const { setTheme, theme } = useTheme();
   const router = useRouter();
-  const { user, signOut } = useApp();
+  const { user, signOut, clients, products, sales, transactions } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
 
   // Busca local por módulos. É rápida, dispensa API extra e funciona mesmo
   // quando o usuário só lembra parte do nome da área que quer abrir.
-  const searchResults = useMemo(() => {
+  const searchResults = useMemo<SearchResult[]>(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return [];
 
-    return searchableRoutes.filter(route =>
-      `${route.label} ${route.keywords}`.toLowerCase().includes(query)
-    );
-  }, [searchTerm]);
+    const pageResults = searchableRoutes
+      .filter(route => `${route.label} ${route.keywords}`.toLowerCase().includes(query))
+      .map(route => ({ label: route.label, detail: 'Módulo', href: route.href }));
+
+    const dataResults = [
+      ...clients
+        .filter(client => `${client.name} ${client.document} ${client.email}`.toLowerCase().includes(query))
+        .map(client => ({
+          label: client.name,
+          detail: `Cliente • ${client.document}`,
+          href: `/dashboard/clientes?busca=${encodeURIComponent(client.name)}`,
+        })),
+      ...products
+        .filter(product => `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(query))
+        .map(product => ({
+          label: product.name,
+          detail: `Produto • ${product.sku}`,
+          href: `/dashboard/produtos?busca=${encodeURIComponent(product.sku)}`,
+        })),
+      ...sales
+        .filter(sale => `${sale.id} ${sale.clientName}`.toLowerCase().includes(query))
+        .map(sale => ({
+          label: `Venda #${sale.id.slice(0, 8).toUpperCase()}`,
+          detail: `Venda • ${sale.clientName}`,
+          href: `/dashboard/vendas?busca=${encodeURIComponent(sale.id)}`,
+        })),
+      ...transactions
+        .filter(transaction => `${transaction.description} ${transaction.category}`.toLowerCase().includes(query))
+        .map(transaction => ({
+          label: transaction.description,
+          detail: `Financeiro • ${transaction.category}`,
+          href: `/dashboard/financeiro?busca=${encodeURIComponent(transaction.description)}`,
+        })),
+    ];
+
+    return [...pageResults, ...dataResults].slice(0, 8);
+  }, [searchTerm, clients, products, sales, transactions]);
 
   const goToFirstResult = () => {
     const [firstResult] = searchResults;
@@ -83,16 +122,19 @@ export function Navbar() {
           {searchResults.length > 0 && (
             <div className="absolute left-0 top-11 z-50 w-80 rounded-2xl border bg-popover p-1 text-sm shadow-xl shadow-slate-900/10">
               {searchResults.map(result => (
-                <button
-                  key={result.href}
+                  <button
+                    key={result.href}
                   type="button"
                   className="flex w-full items-center rounded-xl px-3 py-2 text-left font-medium hover:bg-accent hover:text-accent-foreground"
                   onClick={() => {
                     setSearchTerm('');
                     router.push(result.href);
                   }}
-                >
-                  {result.label}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate">{result.label}</span>
+                      <span className="block truncate text-xs font-normal text-muted-foreground">{result.detail}</span>
+                    </span>
                 </button>
               ))}
             </div>

@@ -61,6 +61,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   // e a função addSale que chama a RPC no banco
   const { clients, products: dbProducts, addSale } = useApp();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // ── React Hook Form com useFieldArray (para campos dinâmicos) ──
   const {
@@ -90,6 +91,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   // Observa mudanças em tempo real
   const watchedProducts = useWatch({ control, name: 'products' });
   const watchedClientId = useWatch({ control, name: 'clientId' });
+  const watchedStatus = useWatch({ control, name: 'status' });
   const watchedTotal = useWatch({ control, name: 'total' });
 
   // ── Efeito: Auto-preenche nome do cliente ao selecionar ──
@@ -154,34 +156,39 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   };
 
   // ── Handler: Submit da venda ──
-  const onSubmit = (data: SaleFormValues) => {
+  const onSubmit = async (data: SaleFormValues) => {
     setErrorMsg(null);
 
-    // Validação extra de estoque (mensagens amigáveis)
-    // A RPC no banco também valida, mas aqui damos mensagens melhores
-    for (const item of data.products) {
-      const product = dbProducts.find(p => p.id === item.productId);
-      if (!product) {
-        setErrorMsg('Produto inválido selecionado.');
-        return;
-      }
-      if (product.stock < item.quantity) {
-        setErrorMsg(
-          `Estoque insuficiente para "${product.name}". ` +
-          `Estoque disponível: ${product.stock} unidades.`
-        );
-        return;
+    // Pedido pendente não movimenta estoque. Em venda concluída, esta
+    // conferência antecipa uma mensagem amigável; o banco valida novamente.
+    if (data.status === 'completed') {
+      for (const item of data.products) {
+        const product = dbProducts.find(p => p.id === item.productId);
+        if (!product) {
+          setErrorMsg('Produto inválido selecionado.');
+          return;
+        }
+        if (product.stock < item.quantity) {
+          setErrorMsg(
+            `Estoque insuficiente para "${product.name}". ` +
+            `Estoque disponível: ${product.stock} unidades.`
+          );
+          return;
+        }
       }
     }
 
-    // addSale é async e retorna { error: string | null }
-    addSale(data).then((result) => {
+    setIsSaving(true);
+    try {
+      const result = await addSale(data);
       if (result.error) {
-        setErrorMsg(result.error);  // Mostra erro retornado pela RPC
+        setErrorMsg(result.error);
       } else {
-        onOpenChange(false);        // Fecha modal em caso de sucesso
+        onOpenChange(false);
       }
-    });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // ── RENDER ──
@@ -230,7 +237,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="completed">Concluída (Baixa imediata no estoque)</option>
-                <option value="pending">Pendente (Apenas registra)</option>
+                <option value="pending">Pendente (sem estoque e sem caixa)</option>
               </select>
             </div>
           </div>
@@ -277,6 +284,11 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
                           </option>
                         ))}
                       </select>
+                      {errors.products?.[index]?.productId && (
+                        <p className="text-xs font-semibold text-destructive">
+                          {errors.products[index]?.productId?.message}
+                        </p>
+                      )}
                     </div>
 
                     {/* Campo Quantidade */}
@@ -333,18 +345,18 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
           <div className="h-px bg-border my-2" />
           <div className="flex justify-between items-center text-lg font-bold bg-muted/20 p-4 rounded-lg">
             <span>Total Geral:</span>
-            <span className="text-indigo-600 dark:text-indigo-400">
+            <span className="text-primary">
               R$ {watchedTotal?.toFixed(2) || '0.00'}
             </span>
           </div>
 
           {/* ── Botões ── */}
           <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => { setErrorMsg(null); onOpenChange(false); }}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-              Finalizar Venda
+              <Button type="submit" disabled={isSaving}>
+               {isSaving ? 'Registrando...' : watchedStatus === 'pending' ? 'Registrar pedido' : 'Finalizar venda'}
             </Button>
           </DialogFooter>
         </form>

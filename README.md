@@ -62,7 +62,7 @@ graph TD
 
 1. **Clonar o repositório**:
    ```bash
-git clone https://github.com/yuriOleal/leal-erp.git
+   git clone https://github.com/seu-usuario/leal-erp.git
    cd leal-erp
    ```
 
@@ -80,7 +80,7 @@ git clone https://github.com/yuriOleal/leal-erp.git
    - `NEXT_PUBLIC_SUPABASE_URL`: URL do projeto (ex: `https://xxxxx.supabase.co`)
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Chave anônima pública
    
-   > ⚠️ **Importante**: Execute também o script SQL em `supabase/migration.sql` no SQL Editor do Supabase para criar as tabelas e políticas RLS.
+   > ⚠️ **Importante**: Execute `supabase/migration.sql` e, em seguida, `supabase/migration-v1.0.4.sql` no SQL Editor do Supabase. O segundo arquivo reforça as regras de venda, adiciona histórico de estoque e garante que pedidos pendentes não movimentem caixa ou saldo.
 
 4. **Rodar em desenvolvimento**:
    ```bash

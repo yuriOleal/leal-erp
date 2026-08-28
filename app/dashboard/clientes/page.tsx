@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,11 +16,13 @@ import { MetricCard } from '@/components/metric-card';
 import { EmptyState } from '@/components/empty-state';
 import { formatDate } from '@/lib/formatters';
 
-export default function ClientesPage() {
+function ClientesPageContent() {
   const { clients, deleteClient } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('busca') ?? '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filteredClients = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -47,10 +50,12 @@ export default function ClientesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteClient = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este cliente?')) {
-      deleteClient(id);
-    }
+  const handleDeleteClient = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
+
+    setActionError(null);
+    const result = await deleteClient(id);
+    if (result.error) setActionError(result.error);
   };
 
   return (
@@ -66,6 +71,10 @@ export default function ClientesPage() {
           </Button>
         }
       />
+
+      {actionError && (
+        <p className="rounded-2xl bg-destructive/10 p-3 text-sm font-medium text-destructive">{actionError}</p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
@@ -185,5 +194,13 @@ export default function ClientesPage() {
         clientToEdit={clientToEdit}
       />
     </div>
+  );
+}
+
+export default function ClientesPage() {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/60" />}>
+      <ClientesPageContent />
+    </Suspense>
   );
 }

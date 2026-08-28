@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/empty-state';
 import { MetricCard } from '@/components/metric-card';
 import { PageHeader } from '@/components/page-header';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrency, formatDate, isInCurrentMonth } from '@/lib/formatters';
 import {
   AlertTriangle,
   ArrowRight,
@@ -102,7 +102,7 @@ export default function DashboardPage() {
   }, [transactions]);
 
   const totalExpenses = transactions
-    .filter(transaction => transaction.type === 'expense')
+    .filter(transaction => transaction.type === 'expense' && isInCurrentMonth(transaction.date))
     .reduce((total, transaction) => total + transaction.amount, 0);
 
   const balance = stats.monthlyRevenue - totalExpenses;
@@ -280,14 +280,14 @@ export default function DashboardPage() {
         <MetricCard
           label="Receita"
           value={formatCurrency(stats.monthlyRevenue)}
-          description="Entradas registradas no financeiro."
+          description="Entradas registradas no mês atual."
           icon={DollarSign}
           tone="green"
         />
         <MetricCard
           label="Lucro estimado"
           value={formatCurrency(stats.estimatedProfit)}
-          description="Receitas menos despesas já lançadas."
+          description="Receitas menos despesas do mês atual."
           icon={TrendingUp}
           tone={stats.estimatedProfit > 0 ? 'green' : 'slate'}
         />

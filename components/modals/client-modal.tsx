@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { clientSchema } from '@/lib/validations/schemas';
@@ -46,6 +46,8 @@ type ClientFormValues = Omit<Client, 'id' | 'createdAt'>;
 
 export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalProps) {
   const { addClient, updateClient } = useApp(); // Funções CRUD do contexto
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // ── Configuração do React Hook Form ──
   const {
@@ -92,20 +94,35 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
   }, [open, clientToEdit, reset]);
 
   // ── Handler de submit ──
-  const onSubmit = (data: ClientFormValues) => {
-    if (clientToEdit) {
-      // Modo EDIÇÃO: atualiza cliente existente
-      updateClient(clientToEdit.id, data);
-    } else {
-      // Modo CRIAÇÃO: insere novo cliente
-      addClient(data);
+  const onSubmit = async (data: ClientFormValues) => {
+    setSubmitError(null);
+    setIsSaving(true);
+
+    try {
+      const result = clientToEdit
+        ? await updateClient(clientToEdit.id, data)
+        : await addClient(data);
+
+      if (result.error) {
+        setSubmitError(result.error);
+        return;
+      }
+
+      onOpenChange(false);
+    } finally {
+      setIsSaving(false);
     }
-    onOpenChange(false); // Fecha o modal
   };
 
   // ── RENDER ──
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setSubmitError(null);
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
@@ -114,6 +131,11 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+          {submitError && (
+            <p className="rounded-xl bg-destructive/10 p-3 text-sm font-medium text-destructive">
+              {submitError}
+            </p>
+          )}
           {/* Campo: Nome / Razão Social */}
           <div className="space-y-1">
             <Label htmlFor="name">Nome / Razão Social</Label>
@@ -162,11 +184,11 @@ export function ClientModal({ open, onOpenChange, clientToEdit }: ClientModalPro
 
           {/* Botões: Cancelar | Salvar */}
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => { setSubmitError(null); onOpenChange(false); }}>
               Cancelar
             </Button>
-            <Button type="submit">
-              {clientToEdit ? 'Salvar Alterações' : 'Cadastrar Cliente'}
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Salvando...' : clientToEdit ? 'Salvar alterações' : 'Cadastrar cliente'}
             </Button>
           </DialogFooter>
         </form>

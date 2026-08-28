@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApp } from '@/lib/context/AppContext';
@@ -14,11 +15,12 @@ import { MetricCard } from '@/components/metric-card';
 import { EmptyState } from '@/components/empty-state';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 
-export default function FinanceiroPage() {
+function FinanceiroPageContent() {
   const { transactions, deleteTransaction } = useApp();
+  const searchParams = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('busca') ?? '');
 
   const filteredTransactions = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -189,5 +191,13 @@ export default function FinanceiroPage() {
         onOpenChange={setIsModalOpen}
       />
     </div>
+  );
+}
+
+export default function FinanceiroPage() {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/60" />}>
+      <FinanceiroPageContent />
+    </Suspense>
   );
 }

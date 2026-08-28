@@ -31,7 +31,9 @@ const toCsv = (rows: Record<string, string | number>[]) => {
 
   const headers = Object.keys(rows[0]);
   const escapeCell = (value: string | number) => {
-    const text = String(value);
+    const rawText = String(value);
+    // Evita que Excel e Sheets interpretem dados cadastrados como fórmulas.
+    const text = /^[=+\-@]/.test(rawText) ? `'${rawText}` : rawText;
     return `"${text.replaceAll('"', '""')}"`;
   };
 
@@ -68,12 +70,23 @@ export default function RelatoriosPage() {
   const { clients, products, sales, transactions } = useApp();
 
   const reports: Report[] = useMemo(() => {
+    const soldQuantityByProduct = new Map<string, number>();
+
+    // Só pedidos concluídos entram em venda realizada. A soma por mapa também
+    // mantém o cálculo correto se um produto aparecer mais de uma vez em dados antigos.
+    sales
+      .filter(sale => sale.status === 'completed')
+      .flatMap(sale => sale.products)
+      .forEach(item => {
+        soldQuantityByProduct.set(
+          item.productId,
+          (soldQuantityByProduct.get(item.productId) ?? 0) + item.quantity
+        );
+      });
+
     const productRanking = products
       .map(product => {
-        const soldQuantity = sales.reduce((total, sale) => {
-          const item = sale.products.find(saleProduct => saleProduct.productId === product.id);
-          return total + (item?.quantity ?? 0);
-        }, 0);
+        const soldQuantity = soldQuantityByProduct.get(product.id) ?? 0;
 
         return {
           SKU: product.sku,

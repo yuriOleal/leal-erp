@@ -20,7 +20,7 @@ import { AppProvider } from '@/lib/context/AppContext';
 
 // ── Metadados para SEO e compartilhamento ──
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
   title: {
     default: 'Leal ERP — vendas, estoque e financeiro em ordem',
     template: '%s | Leal ERP',
