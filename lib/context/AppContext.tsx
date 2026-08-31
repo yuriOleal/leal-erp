@@ -22,9 +22,10 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Client, Product, Sale, Transaction, DashboardStats } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { isInCurrentMonth } from '@/lib/formatters';
 import type { User } from '@supabase/supabase-js';
 
 // ─── INTERFACE DO CONTEXTO ───────────────────────────────────────
@@ -56,10 +57,15 @@ interface AppContextType {
   // ── Vendas ──
   // addSale chama a RPC create_sale_with_items no PostgreSQL
   addSale: (sale: Omit<Sale, 'id' | 'date'>) => Promise<{ error: string | null }>;
+  completePendingSale: (saleId: string) => Promise<{ error: string | null }>;
 
   // ── Transações Financeiras ──
   addTransaction: (transaction: Omit<Transaction, 'id' | 'date'>) => Promise<{ error: string | null }>;
   deleteTransaction: (id: string) => Promise<{ error: string | null }>;
+
+  // ── Estoque ──
+  // Mantém saldo, histórico e financeiro consistentes em uma única operação.
+  adjustStock: (productId: string, type: 'in' | 'out', quantity: number) => Promise<{ error: string | null }>;
 
   // ── Autenticação ──
   signOut: () => Promise<void>;    // Logout: limpa sessão e redireciona
@@ -126,7 +132,8 @@ const mapTransaction = (row: Record<string, unknown>): Transaction => ({
 // ─── PROVEDOR DO CONTEXTO ────────────────────────────────────────
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient(); // Cliente Supabase (browser)
+  // Evita recriar o cliente e os listeners de autenticação a cada renderização.
+  const supabase = useMemo(() => createClient(), []);
 
   // ── Estados locais (dados em memória) ──
   const [user, setUser] = useState<User | null>(null);
@@ -332,18 +339,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addSale = async (saleData: Omit<Sale, 'id' | 'date'>) => {
     if (!user) return { error: 'Usuário não autenticado.' };
 
-    // Chama a função PostgreSQL que criamos em supabase/migration.sql
+    // O banco identifica o usuário pela sessão e recalcula preço e total
+    // com base no catálogo. Nunca confiamos nesses valores do navegador.
     const { data, error } = await supabase.rpc('create_sale_with_items', {
-      p_user_id: user.id,
-      p_client_id: saleData.clientId || null,
-      p_client_name: saleData.clientName,
-      p_total: saleData.total,
+      p_client_id: saleData.clientId,
       p_status: saleData.status,
       p_items: saleData.products.map(p => ({
         product_id: p.productId,
-        name: p.name,
         quantity: p.quantity,
-        price: p.price,
       })),
     });
 
@@ -354,6 +357,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // - sales (nova venda)
     // - products (estoque foi deduzido)
     // - transactions (receita foi lançada)
+    await fetchAllData(user.id);
+    return { error: null };
+  };
+
+  /** Conclui um pedido pendente e só então movimenta estoque e financeiro. */
+  const completePendingSale = async (saleId: string) => {
+    if (!user) return { error: 'Usuário não autenticado.' };
+
+    const { data, error } = await supabase.rpc('complete_pending_sale', {
+      p_sale_id: saleId,
+    });
+
+    if (error) return { error: error.message };
+    if (data && !data.success) return { error: data.error };
+
     await fetchAllData(user.id);
     return { error: null };
   };
@@ -389,6 +407,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   };
 
+  /**
+   * Ajusta estoque por RPC atômica. Entradas também lançam o custo no
+   * financeiro; se qualquer etapa falhar, o banco desfaz a operação inteira.
+   */
+  const adjustStock = async (productId: string, type: 'in' | 'out', quantity: number) => {
+    if (!user) return { error: 'Usuário não autenticado.' };
+
+    const { data, error } = await supabase.rpc('adjust_stock', {
+      p_product_id: productId,
+      p_type: type,
+      p_quantity: quantity,
+    });
+
+    if (error) return { error: error.message };
+    if (data && !data.success) return { error: data.error };
+
+    await fetchAllData(user.id);
+    return { error: null };
+  };
+
   // ═══════════════════════════════════════════════════════════════
   // AUTENTICAÇÃO
   // ═══════════════════════════════════════════════════════════════
@@ -410,10 +448,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    */
   const calculateStats = (): DashboardStats => {
     const lowStockItems = products.filter(p => p.stock < 5).length;
-    const monthlyRevenue = transactions
+    const transactionsThisMonth = transactions.filter(transaction => isInCurrentMonth(transaction.date));
+    const monthlyRevenue = transactionsThisMonth
       .filter(t => t.type === 'income')
       .reduce((acc, t) => acc + t.amount, 0);
-    const totalExpenses = transactions
+    const totalExpenses = transactionsThisMonth
       .filter(t => t.type === 'expense')
       .reduce((acc, t) => acc + t.amount, 0);
     const estimatedProfit = Math.max(0, monthlyRevenue - totalExpenses);
@@ -440,8 +479,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       stats: calculateStats(),        // Recalcula as métricas a cada render
       addClient, updateClient, deleteClient,
       addProduct, updateProduct, deleteProduct,
-      addSale,
+      addSale, completePendingSale,
       addTransaction, deleteTransaction,
+      adjustStock,
       signOut,
       refreshData,
     }}>

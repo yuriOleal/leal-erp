@@ -19,7 +19,7 @@ import { Sidebar } from '@/components/sidebar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Container principal: altura total da tela, sem scroll externo
+    // Container principal: altura total da tela, sem scroll externo.
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Barra lateral fixa com navegação (Clientes, Produtos, Vendas, etc.) */}
       <Sidebar />
@@ -30,7 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Navbar />
 
         {/* Conteúdo da página atual — faz scroll vertical se necessário */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
           {children}
         </main>
       </div>

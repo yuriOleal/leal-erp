@@ -15,8 +15,8 @@
 
 'use client';
 
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { transactionSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
@@ -51,13 +51,15 @@ const CATEGORIES = {
 
 export function TransactionModal({ open, onOpenChange }: TransactionModalProps) {
   const { addTransaction } = useApp();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
-    watch,       // Observa o valor atual de um campo (reativo)
     setValue,    // Define o valor de um campo programaticamente
+    control,
     formState: { errors },
   } = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -69,7 +71,7 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
     },
   });
 
-  const watchedType = watch('type'); // Observa mudanças no tipo (income/expense)
+  const watchedType = useWatch({ control, name: 'type' }); // Observa mudanças no tipo (income/expense)
 
   // Reseta o formulário quando o modal abre
   useEffect(() => {
@@ -84,19 +86,42 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
     setValue('category', '');
   }, [watchedType, setValue]);
 
-  const onSubmit = (data: TransactionFormValues) => {
-    addTransaction(data);
-    onOpenChange(false);
+  const onSubmit = async (data: TransactionFormValues) => {
+    setSubmitError(null);
+    setIsSaving(true);
+
+    try {
+      const result = await addTransaction(data);
+      if (result.error) {
+        setSubmitError(result.error);
+        return;
+      }
+
+      onOpenChange(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setSubmitError(null);
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle>Registrar Lançamento Financeiro</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+          {submitError && (
+            <p className="rounded-xl bg-destructive/10 p-3 text-sm font-medium text-destructive">
+              {submitError}
+            </p>
+          )}
           {/* Tipo: Receita ou Despesa */}
           <div className="space-y-1">
             <Label htmlFor="type">Tipo de Lançamento</Label>
@@ -154,11 +179,11 @@ export function TransactionModal({ open, onOpenChange }: TransactionModalProps) 
 
           {/* Botões */}
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => { setSubmitError(null); onOpenChange(false); }}>
               Cancelar
             </Button>
-            <Button type="submit">
-              Confirmar Lançamento
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Salvando...' : 'Confirmar lançamento'}
             </Button>
           </DialogFooter>
         </form>

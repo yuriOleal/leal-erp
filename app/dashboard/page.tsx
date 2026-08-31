@@ -1,251 +1,503 @@
 'use client';
 
+import dynamic from 'next/dynamic';
+import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context/AppContext';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
   CardTitle,
-  CardDescription
 } from '@/components/ui/card';
-import { Users, Package, ShoppingCart, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/empty-state';
+import { MetricCard } from '@/components/metric-card';
+import { PageHeader } from '@/components/page-header';
+import { formatCurrency, formatDate, isInCurrentMonth } from '@/lib/formatters';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  Circle,
+  DollarSign,
+  Package,
+  PackagePlus,
+  ReceiptText,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+  Wallet,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const DashboardChart = dynamic(
+  () => import('@/components/dashboard-chart').then(module => module.DashboardChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full animate-pulse rounded-2xl bg-muted/60" />,
+  }
+);
+
+type MonthlyData = {
+  name: string;
+  revenue: number;
+  expenses: number;
+};
 
 export default function DashboardPage() {
-  const { products, sales, transactions, stats } = useApp();
+  const router = useRouter();
+  const { clients, products, sales, transactions, stats, isLoading } = useApp();
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
+  const recentSales = useMemo(() => (
+    [...sales]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+  ), [sales]);
 
-  const recentSales = [...sales]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
+  const criticalStock = useMemo(() => (
+    [...products]
+      .filter(product => product.stock < 5)
+      .sort((a, b) => a.stock - b.stock)
+      .slice(0, 5)
+  ), [products]);
 
-  const criticalStock = [...products]
-    .filter(p => p.stock < 5)
-    .sort((a, b) => a.stock - b.stock)
-    .slice(0, 5);
-
-  // Generate dynamic chart data based on actual transactions
-  const generateChartData = () => {
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    
-    // Group by month-year
-    const monthlyData: Record<string, { revenue: number; expenses: number }> = {};
-    
-    // Initialize last 6 months
+  const chartData = useMemo<MonthlyData[]>(() => {
+    const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
+    const buckets = new Map<string, MonthlyData>();
     const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${months[d.getMonth()]}`;
-      monthlyData[key] = { revenue: 0, expenses: 0 };
+
+    // Monta os últimos 6 meses antes de somar os lançamentos,
+    // assim o gráfico mantém largura estável mesmo quando não há dados.
+    for (let index = 5; index >= 0; index -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      const label = monthLabel.format(date).replace('.', '');
+
+      buckets.set(key, {
+        name: label.charAt(0).toUpperCase() + label.slice(1),
+        revenue: 0,
+        expenses: 0,
+      });
     }
 
-    transactions.forEach(t => {
-      try {
-        const date = new Date(t.date);
-        const key = months[date.getMonth()];
-        if (monthlyData[key] !== undefined) {
-          if (t.type === 'income') {
-            monthlyData[key].revenue += t.amount;
-          } else {
-            monthlyData[key].expenses += t.amount;
-          }
-        }
-      } catch (e) {
-        // Skip invalid dates
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      if (Number.isNaN(date.getTime())) return;
+
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      const bucket = buckets.get(key);
+      if (!bucket) return;
+
+      if (transaction.type === 'income') {
+        bucket.revenue += transaction.amount;
+      } else {
+        bucket.expenses += transaction.amount;
       }
     });
 
-    // If all values are 0 (e.g. no transactions matching those months), fallback to visual defaults
-    const hasData = Object.values(monthlyData).some(d => d.revenue > 0 || d.expenses > 0);
-    if (!hasData) {
-      return [
-        { name: 'Jan', revenue: 65000, expenses: 40000 },
-        { name: 'Fev', revenue: 72000, expenses: 42000 },
-        { name: 'Mar', revenue: 90000, expenses: 45000 },
-        { name: 'Abr', revenue: 110000, expenses: 48000 },
-        { name: 'Mai', revenue: 142100, expenses: 50000 },
-        { name: 'Jun', revenue: stats.monthlyRevenue || 80000, expenses: 30000 },
-      ];
-    }
+    return Array.from(buckets.values());
+  }, [transactions]);
 
-    return Object.entries(monthlyData).map(([name, data]) => ({
-      name,
-      revenue: data.revenue,
-      expenses: data.expenses
-    }));
-  };
+  const totalExpenses = transactions
+    .filter(transaction => transaction.type === 'expense' && isInCurrentMonth(transaction.date))
+    .reduce((total, transaction) => total + transaction.amount, 0);
 
-  const chartData = generateChartData();
+  const balance = stats.monthlyRevenue - totalExpenses;
+  const averageTicket = sales.length
+    ? sales.reduce((total, sale) => total + sale.total, 0) / sales.length
+    : 0;
+  const inventoryValue = products.reduce(
+    (total, product) => total + product.stock * product.purchasePrice,
+    0
+  );
+  const hasFinancialData = chartData.some(item => item.revenue > 0 || item.expenses > 0);
+
+  const setupSteps = [
+    {
+      title: 'Cadastrar clientes',
+      description: 'Monte a carteira para registrar vendas com histórico.',
+      done: clients.length > 0,
+      href: '/dashboard/clientes',
+    },
+    {
+      title: 'Cadastrar produtos',
+      description: 'Organize catálogo, preço, custo e fornecedor.',
+      done: products.length > 0,
+      href: '/dashboard/produtos',
+    },
+    {
+      title: 'Registrar primeira venda',
+      description: 'Valide o fluxo comercial e a baixa de estoque.',
+      done: sales.length > 0,
+      href: '/dashboard/vendas',
+    },
+    {
+      title: 'Acompanhar financeiro',
+      description: 'Veja receitas, despesas e saldo do período.',
+      done: transactions.length > 0,
+      href: '/dashboard/financeiro',
+    },
+  ];
+
+  const completedSteps = setupSteps.filter(step => step.done).length;
+  const setupProgress = Math.round((completedSteps / setupSteps.length) * 100);
+
+  const priorityActions = [
+    stats.lowStockItems > 0 && {
+      title: `${stats.lowStockItems} item(ns) com estoque baixo`,
+      description: 'Priorize reposição antes de novas vendas.',
+      href: '/dashboard/estoque',
+      tone: 'rose',
+    },
+    products.length === 0 && {
+      title: 'Cadastre o catálogo inicial',
+      description: 'Produtos são a base para vendas, estoque e relatórios.',
+      href: '/dashboard/produtos',
+      tone: 'amber',
+    },
+    clients.length === 0 && {
+      title: 'Inclua seus primeiros clientes',
+      description: 'Isso melhora histórico comercial e relatórios.',
+      href: '/dashboard/clientes',
+      tone: 'green',
+    },
+    sales.length === 0 && products.length > 0 && {
+      title: 'Faça a primeira venda',
+      description: 'Teste o fluxo completo do ERP com dados reais.',
+      href: '/dashboard/vendas',
+      tone: 'green',
+    },
+  ].filter(Boolean) as Array<{
+    title: string;
+    description: string;
+    href: string;
+    tone: 'green' | 'amber' | 'rose';
+  }>;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">Visão geral do seu negócio</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Painel de operação"
+        title="Dashboard"
+        description="Acompanhe vendas, caixa, clientes e estoque com foco no que precisa de atenção agora."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => router.push('/dashboard/produtos')}>
+              <PackagePlus className="h-4 w-4" />
+              Produto
+            </Button>
+            <Button onClick={() => router.push('/dashboard/vendas')}>
+              <ShoppingCart className="h-4 w-4" />
+              Nova venda
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita do Mês</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</div>
-            <p className="text-xs text-muted-foreground">+12% em relação ao mês anterior</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lucro Estimado</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.estimatedProfit)}</div>
-            <p className="text-xs text-muted-foreground">+8.5% em relação ao mês anterior</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Novos Clientes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalClients}</div>
-            <p className="text-xs text-muted-foreground">+2 novos nesta semana</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
-            <AlertTriangle className={`h-4 w-4 ${stats.lowStockItems > 0 ? 'text-destructive animate-pulse' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${stats.lowStockItems > 0 ? 'text-destructive' : ''}`}>
-              {stats.lowStockItems}
-            </div>
-            <p className="text-xs text-muted-foreground">Itens precisam de reposição</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Receitas vs Despesas</CardTitle>
-            <CardDescription>Acompanhamento financeiro dos últimos 6 meses</CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value/1000}k`} />
-                  <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Bar dataKey="revenue" name="Receitas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Últimas Vendas</CardTitle>
-            <CardDescription>Resumo das vendas recentes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {recentSales.map(sale => (
-                <div key={sale.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                      {sale.clientName.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium leading-none">{sale.clientName}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{new Date(sale.date).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium">
-                    +{formatCurrency(sale.total)}
-                  </div>
-                </div>
-              ))}
-              {recentSales.length === 0 && (
-                <p className="text-sm text-center text-muted-foreground py-8">Nenhuma venda registrada.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Evolução de Caixa</CardTitle>
-            <CardDescription>Projeção de fluxo de caixa</CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value/1000}k`} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Line type="monotone" dataKey="revenue" name="Saldo" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Estoque Crítico</CardTitle>
-            <CardDescription>Produtos que necessitam de reposição imediata</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <Card className="relative overflow-hidden border-emerald-950/10 bg-[#123c32] text-white shadow-lg shadow-emerald-950/10 dark:border-white/10">
+          <CardContent className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="space-y-4">
-              {criticalStock.map(product => (
-                <div key={product.id} className="flex items-center justify-between border-b last:border-0 pb-4 last:pb-0">
-                  <div className="flex items-center space-x-3">
-                    <Package className="h-8 w-8 text-muted-foreground bg-muted p-1.5 rounded-md" />
-                    <div>
-                      <p className="text-sm font-medium leading-none">{product.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">SKU: {product.sku}</p>
-                    </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
+                <CheckCircle2 className="h-3.5 w-3.5 text-amber-300" />
+                {isLoading ? 'Sincronizando dados' : 'Dados conectados ao seu ambiente'}
+              </div>
+              <div className="space-y-2">
+                <h2 className="max-w-2xl text-2xl font-bold tracking-[-0.04em] sm:text-3xl">
+                  Sua operação em uma visão clara, sem métricas inventadas.
+                </h2>
+                <p className="max-w-2xl text-sm leading-6 text-white/70">
+                  O Leal ERP cruza os cadastros reais de clientes, produtos, vendas e financeiro para orientar a rotina do negócio.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 rounded-3xl border border-white/15 bg-white/10 p-3 text-sm backdrop-blur sm:min-w-[330px]">
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-xs text-white/55">Saldo atual</p>
+                <p className="mt-2 text-xl font-bold">{formatCurrency(balance)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-xs text-white/55">Ticket médio</p>
+                <p className="mt-2 text-xl font-bold">{formatCurrency(averageTicket)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-xs text-white/55">Valor em estoque</p>
+                <p className="mt-2 text-xl font-bold">{formatCurrency(inventoryValue)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-xs text-white/55">Vendas</p>
+                <p className="mt-2 text-xl font-bold">{stats.totalSales}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/70 bg-white/75 shadow-sm shadow-slate-200/60 backdrop-blur dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+          <CardHeader>
+            <CardTitle>Próximas ações</CardTitle>
+            <CardDescription>Prioridades geradas a partir dos dados atuais.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {priorityActions.length > 0 ? (
+              priorityActions.map(action => (
+                <button
+                  key={action.title}
+                  type="button"
+                  onClick={() => router.push(action.href)}
+                  className="group flex w-full items-start justify-between gap-3 rounded-2xl border bg-card p-3 text-left transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md dark:border-white/10"
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">{action.title}</p>
+                    <p className="text-xs leading-5 text-muted-foreground">{action.description}</p>
                   </div>
-                  <div className="text-right flex flex-col items-end">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${product.stock === 0 ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-                      {product.stock} em estoque
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {criticalStock.length === 0 && (
-                <p className="text-sm text-center text-muted-foreground py-8">Estoque em níveis normais.</p>
+                  <ArrowRight
+                    className={cn(
+                      'mt-0.5 h-4 w-4 shrink-0 transition group-hover:translate-x-0.5',
+                      action.tone === 'rose' && 'text-rose-500',
+                      action.tone === 'amber' && 'text-amber-500',
+                      action.tone === 'green' && 'text-emerald-600'
+                    )}
+                  />
+                </button>
+              ))
+            ) : (
+              <EmptyState
+                icon={CheckCircle2}
+                title="Operação sem alertas críticos"
+                description="Continue acompanhando vendas, estoque e lançamentos para manter os indicadores atualizados."
+                className="py-6"
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Receita"
+          value={formatCurrency(stats.monthlyRevenue)}
+          description="Entradas registradas no mês atual."
+          icon={DollarSign}
+          tone="green"
+        />
+        <MetricCard
+          label="Lucro estimado"
+          value={formatCurrency(stats.estimatedProfit)}
+          description="Receitas menos despesas do mês atual."
+          icon={TrendingUp}
+          tone={stats.estimatedProfit > 0 ? 'green' : 'slate'}
+        />
+        <MetricCard
+          label="Clientes"
+          value={stats.totalClients}
+          description="Carteira cadastrada na conta."
+          icon={Users}
+          tone="slate"
+        />
+        <MetricCard
+          label="Estoque baixo"
+          value={stats.lowStockItems}
+          description="Itens abaixo do nível de segurança."
+          icon={AlertTriangle}
+          tone={stats.lowStockItems > 0 ? 'rose' : 'green'}
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
+        <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Receitas vs despesas</CardTitle>
+              <CardDescription>Acompanhamento financeiro dos últimos 6 meses.</CardDescription>
+            </div>
+            <div className="flex gap-2 text-xs">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                Receitas
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                Despesas
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[320px] w-full">
+              {hasFinancialData ? (
+                <DashboardChart data={chartData} type="bar" />
+              ) : (
+                <EmptyState
+                  icon={BarChart3}
+                  title="Sem movimentação financeira ainda"
+                  description="Registre uma venda ou lançamento financeiro para o gráfico ganhar vida."
+                  action={
+                    <Button size="sm" onClick={() => router.push('/dashboard/financeiro')}>
+                      Registrar lançamento
+                    </Button>
+                  }
+                />
               )}
             </div>
           </CardContent>
         </Card>
-      </div>
+
+        <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+          <CardHeader>
+            <CardTitle>Implantação</CardTitle>
+            <CardDescription>{completedSteps} de {setupSteps.length} etapas concluídas.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary to-amber-500 transition-all"
+                style={{ width: `${setupProgress}%` }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              {setupSteps.map(step => (
+                <button
+                  key={step.title}
+                  type="button"
+                  onClick={() => router.push(step.href)}
+                  className="flex w-full items-start gap-3 rounded-2xl p-2 text-left transition hover:bg-muted/70"
+                >
+                  {step.done ? (
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  ) : (
+                    <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span>
+                    <span className="block text-sm font-semibold">{step.title}</span>
+                    <span className="block text-xs leading-5 text-muted-foreground">
+                      {step.description}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_1fr_0.9fr]">
+        <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+          <CardHeader>
+            <CardTitle>Evolução de caixa</CardTitle>
+            <CardDescription>Saldo líquido por mês.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[240px] w-full">
+              {hasFinancialData ? (
+                <DashboardChart data={chartData} type="line" />
+              ) : (
+                <EmptyState
+                  icon={Wallet}
+                  title="Caixa aguardando dados"
+                  description="O saldo aparecerá quando houver receitas ou despesas registradas."
+                  className="py-6"
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+          <CardHeader>
+            <CardTitle>Últimas vendas</CardTitle>
+            <CardDescription>Pedidos registrados mais recentemente.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {recentSales.length > 0 ? (
+              recentSales.map(sale => (
+                <button
+                  key={sale.id}
+                  type="button"
+                  onClick={() => router.push('/dashboard/vendas')}
+                  className="group flex w-full items-center justify-between gap-3 rounded-2xl p-2 text-left transition hover:bg-muted/70"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-sm font-bold text-primary">
+                      {sale.clientName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{sale.clientName}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(sale.date)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                      {formatCurrency(sale.total)}
+                    </p>
+                    <p className="text-xs text-muted-foreground group-hover:text-primary">Ver venda</p>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <EmptyState
+                icon={ReceiptText}
+                title="Nenhuma venda registrada"
+                description="Quando a primeira venda entrar, ela aparecerá aqui com cliente, data e valor."
+                action={
+                  <Button size="sm" onClick={() => router.push('/dashboard/vendas')}>
+                    Criar venda
+                  </Button>
+                }
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+          <CardHeader>
+            <CardTitle>Estoque crítico</CardTitle>
+            <CardDescription>Produtos que merecem reposição.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {criticalStock.length > 0 ? (
+              criticalStock.map(product => (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => router.push('/dashboard/estoque')}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl border bg-card p-3 text-left transition hover:border-amber-400/60 hover:bg-amber-50/60 dark:border-white/10 dark:hover:bg-amber-500/10"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="rounded-2xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                      <Package className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">SKU {product.sku}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-full px-2.5 py-1 text-xs font-bold',
+                      product.stock === 0
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                    )}
+                  >
+                    {product.stock} un.
+                  </span>
+                </button>
+              ))
+            ) : (
+              <EmptyState
+                icon={CheckCircle2}
+                title="Estoque em nível saudável"
+                description="Nenhum produto está abaixo do limite crítico de 5 unidades."
+                className="py-6"
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
