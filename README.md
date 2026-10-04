@@ -62,7 +62,7 @@ graph TD
 
 1. **Clonar o repositório**:
    ```bash
-   git clone https://github.com/seu-usuario/leal-erp.git
+   git clone https://github.com/yuriOleal/leal-erp.git
    cd leal-erp
    ```
 
