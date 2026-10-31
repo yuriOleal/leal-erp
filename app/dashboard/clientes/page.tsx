@@ -1,26 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApp } from '@/lib/context/AppContext';
 import { Client } from '@/types';
-import { Search, Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Pencil, Trash2, Users, UserRoundPlus, Mail, CalendarDays } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ClientModal } from '@/components/modals/client-modal';
+import { PageHeader } from '@/components/page-header';
+import { MetricCard } from '@/components/metric-card';
+import { EmptyState } from '@/components/empty-state';
+import { formatDate } from '@/lib/formatters';
 
-export default function ClientesPage() {
+function ClientesPageContent() {
   const { clients, deleteClient } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('busca') ?? '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.document.includes(searchTerm)
-  );
+  const filteredClients = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return clients;
+
+    return clients.filter(client =>
+      client.name.toLowerCase().includes(query) ||
+      client.document.includes(query) ||
+      client.phone.toLowerCase().includes(query) ||
+      client.email.toLowerCase().includes(query)
+    );
+  }, [clients, searchTerm]);
+
+  const clientsWithEmail = clients.filter(client => client.email.trim().length > 0).length;
+  const newestClient = [...clients]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
   const handleNewClient = () => {
     setClientToEdit(null);
@@ -32,41 +50,75 @@ export default function ClientesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteClient = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este cliente?')) {
-      deleteClient(id);
-    }
+  const handleDeleteClient = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
+
+    setActionError(null);
+    const result = await deleteClient(id);
+    if (result.error) setActionError(result.error);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-          <p className="text-muted-foreground">Gerencie sua carteira de clientes</p>
-        </div>
-        <Button onClick={handleNewClient} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Cliente
-        </Button>
+      <PageHeader
+        eyebrow="Relacionamento"
+        title="Clientes"
+        description="Centralize sua carteira com documentos válidos, contato e histórico para vender com mais controle."
+        actions={
+          <Button onClick={handleNewClient}>
+            <Plus className="h-4 w-4" />
+            Novo cliente
+          </Button>
+        }
+      />
+
+      {actionError && (
+        <p className="rounded-2xl bg-destructive/10 p-3 text-sm font-medium text-destructive">{actionError}</p>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          label="Clientes"
+          value={clients.length}
+          description="Cadastros ativos na conta."
+          icon={Users}
+          tone="green"
+        />
+        <MetricCard
+          label="Com email"
+          value={clientsWithEmail}
+          description="Contatos prontos para comunicação."
+          icon={Mail}
+          tone="slate"
+        />
+        <MetricCard
+          label="Mais recente"
+          value={newestClient ? formatDate(newestClient.createdAt) : '—'}
+          description={newestClient ? newestClient.name : 'Nenhum cadastro ainda.'}
+          icon={CalendarDays}
+          tone="amber"
+        />
       </div>
 
-      <Card>
-        <CardHeader className="pb-3 border-b">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+        <CardHeader className="border-b pb-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar por nome ou CPF/CNPJ..."
-                className="pl-8 bg-background"
+                placeholder="Buscar por nome, CPF/CNPJ, telefone ou email..."
+                className="h-10 rounded-xl bg-background pl-9"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
+            <p className="text-xs font-medium text-muted-foreground">
+              {filteredClients.length} de {clients.length} cliente(s)
+            </p>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="overflow-x-auto p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -74,23 +126,24 @@ export default function ClientesPage() {
                 <TableHead>Documento</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
-                <TableHead className="hidden lg:table-cell">Data Cadastro</TableHead>
+                <TableHead className="hidden lg:table-cell">Cadastro</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredClients.map((client) => (
                 <TableRow key={client.id}>
-                  <TableCell className="font-medium">{client.name}</TableCell>
-                  <TableCell>{client.document}</TableCell>
+                  <TableCell>
+                    <div className="font-semibold">{client.name}</div>
+                    <div className="text-xs text-muted-foreground lg:hidden">{client.email}</div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{client.document}</TableCell>
                   <TableCell>{client.phone}</TableCell>
                   <TableCell className="hidden md:table-cell">{client.email}</TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {new Date(client.createdAt).toLocaleDateString('pt-BR')}
-                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">{formatDate(client.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0">
+                      <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-accent hover:text-accent-foreground">
                         <span className="sr-only">Abrir menu</span>
                         <MoreHorizontal className="h-4 w-4" />
                       </DropdownMenuTrigger>
@@ -110,8 +163,23 @@ export default function ClientesPage() {
               ))}
               {filteredClients.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
-                    Nenhum cliente encontrado.
+                  <TableCell colSpan={6}>
+                    <EmptyState
+                      icon={UserRoundPlus}
+                      title={clients.length === 0 ? 'Nenhum cliente cadastrado' : 'Nenhum cliente encontrado'}
+                      description={
+                        clients.length === 0
+                          ? 'Cadastre o primeiro cliente para começar a montar histórico de vendas e atendimento.'
+                          : 'Tente outro termo de busca para localizar o cadastro desejado.'
+                      }
+                      action={
+                        clients.length === 0 ? (
+                          <Button size="sm" onClick={handleNewClient}>
+                            Cadastrar cliente
+                          </Button>
+                        ) : undefined
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -120,11 +188,19 @@ export default function ClientesPage() {
         </CardContent>
       </Card>
 
-      <ClientModal 
-        open={isModalOpen} 
-        onOpenChange={setIsModalOpen} 
-        clientToEdit={clientToEdit} 
+      <ClientModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        clientToEdit={clientToEdit}
       />
     </div>
+  );
+}
+
+export default function ClientesPage() {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/60" />}>
+      <ClientesPageContent />
+    </Suspense>
   );
 }

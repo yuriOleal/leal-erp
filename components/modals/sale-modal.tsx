@@ -14,7 +14,7 @@
 //
 // CARACTERÍSTICAS:
 // - useFieldArray: permite adicionar/remover linhas de produtos dinamicamente
-// - Cálculo de total em tempo real (watch + useEffect)
+// - Cálculo de total em tempo real (useWatch + useEffect)
 // - Validação de estoque em duas camadas (frontend + RPC no banco)
 // - Preço do produto é preenchido automaticamente ao selecionar
 // ================================================================
@@ -22,7 +22,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { saleSchema } from '@/lib/validations/schemas';
 import { useApp } from '@/lib/context/AppContext';
@@ -61,13 +61,13 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   // e a função addSale que chama a RPC no banco
   const { clients, products: dbProducts, addSale } = useApp();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // ── React Hook Form com useFieldArray (para campos dinâmicos) ──
   const {
     register,
     handleSubmit,
     control,      // Necessário para useFieldArray
-    watch,        // Observa valores em tempo real (reativo)
     setValue,     // Define valores programaticamente
     reset,        // Reseta o formulário
     formState: { errors },
@@ -89,8 +89,10 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   });
 
   // Observa mudanças em tempo real
-  const watchedProducts = watch('products');
-  const watchedClientId = watch('clientId');
+  const watchedProducts = useWatch({ control, name: 'products' });
+  const watchedClientId = useWatch({ control, name: 'clientId' });
+  const watchedStatus = useWatch({ control, name: 'status' });
+  const watchedTotal = useWatch({ control, name: 'total' });
 
   // ── Efeito: Auto-preenche nome do cliente ao selecionar ──
   useEffect(() => {
@@ -128,9 +130,13 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
         status: 'completed',
         total: 0,
       });
-      setErrorMsg(null);
     }
   }, [open, reset]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setErrorMsg(null);
+    onOpenChange(nextOpen);
+  };
 
   // ── Handler: Ao selecionar um produto no dropdown ──
   // Preenche automaticamente nome e preço de venda
@@ -150,39 +156,44 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
   };
 
   // ── Handler: Submit da venda ──
-  const onSubmit = (data: SaleFormValues) => {
+  const onSubmit = async (data: SaleFormValues) => {
     setErrorMsg(null);
 
-    // Validação extra de estoque (mensagens amigáveis)
-    // A RPC no banco também valida, mas aqui damos mensagens melhores
-    for (const item of data.products) {
-      const product = dbProducts.find(p => p.id === item.productId);
-      if (!product) {
-        setErrorMsg('Produto inválido selecionado.');
-        return;
-      }
-      if (product.stock < item.quantity) {
-        setErrorMsg(
-          `Estoque insuficiente para "${product.name}". ` +
-          `Estoque disponível: ${product.stock} unidades.`
-        );
-        return;
+    // Pedido pendente não movimenta estoque. Em venda concluída, esta
+    // conferência antecipa uma mensagem amigável; o banco valida novamente.
+    if (data.status === 'completed') {
+      for (const item of data.products) {
+        const product = dbProducts.find(p => p.id === item.productId);
+        if (!product) {
+          setErrorMsg('Produto inválido selecionado.');
+          return;
+        }
+        if (product.stock < item.quantity) {
+          setErrorMsg(
+            `Estoque insuficiente para "${product.name}". ` +
+            `Estoque disponível: ${product.stock} unidades.`
+          );
+          return;
+        }
       }
     }
 
-    // addSale é async e retorna { error: string | null }
-    addSale(data).then((result) => {
+    setIsSaving(true);
+    try {
+      const result = await addSale(data);
       if (result.error) {
-        setErrorMsg(result.error);  // Mostra erro retornado pela RPC
+        setErrorMsg(result.error);
       } else {
-        onOpenChange(false);        // Fecha modal em caso de sucesso
+        onOpenChange(false);
       }
-    });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // ── RENDER ──
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Registrar Nova Venda</DialogTitle>
@@ -226,7 +237,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="completed">Concluída (Baixa imediata no estoque)</option>
-                <option value="pending">Pendente (Apenas registra)</option>
+                <option value="pending">Pendente (sem estoque e sem caixa)</option>
               </select>
             </div>
           </div>
@@ -249,9 +260,10 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
 
             <div className="space-y-3">
               {fields.map((field, index) => {
-                const currentProductId = watch(`products.${index}.productId`);
-                const productDb = dbProducts.find(p => p.id === currentProductId);
-                const stockLeft = productDb ? productDb.stock : 0;
+                const currentProduct = watchedProducts?.[index];
+                const currentProductId = currentProduct?.productId ?? '';
+                const quantity = currentProduct?.quantity || 0;
+                const price = currentProduct?.price || 0;
 
                 return (
                   <div key={field.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-muted/40 p-3 rounded-lg border border-border/50">
@@ -272,6 +284,11 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
                           </option>
                         ))}
                       </select>
+                      {errors.products?.[index]?.productId && (
+                        <p className="text-xs font-semibold text-destructive">
+                          {errors.products[index]?.productId?.message}
+                        </p>
+                      )}
                     </div>
 
                     {/* Campo Quantidade */}
@@ -299,7 +316,7 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
                     {/* Subtotal da linha + botão remover */}
                     <div className="flex items-center justify-between w-full sm:w-auto gap-4 sm:pl-2">
                       <span className="text-xs font-bold whitespace-nowrap min-w-[70px] text-right">
-                        R$ {((watch(`products.${index}.quantity`) || 0) * (watch(`products.${index}.price`) || 0)).toFixed(2)}
+                        R$ {(quantity * price).toFixed(2)}
                       </span>
 
                       {/* Botão remover (só aparece se tiver mais de 1 linha) */}
@@ -328,18 +345,18 @@ export function SaleModal({ open, onOpenChange }: SaleModalProps) {
           <div className="h-px bg-border my-2" />
           <div className="flex justify-between items-center text-lg font-bold bg-muted/20 p-4 rounded-lg">
             <span>Total Geral:</span>
-            <span className="text-indigo-600 dark:text-indigo-400">
-              R$ {watch('total')?.toFixed(2) || '0.00'}
+            <span className="text-primary">
+              R$ {watchedTotal?.toFixed(2) || '0.00'}
             </span>
           </div>
 
           {/* ── Botões ── */}
           <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => { setErrorMsg(null); onOpenChange(false); }}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-              Finalizar Venda
+              <Button type="submit" disabled={isSaving}>
+               {isSaving ? 'Registrando...' : watchedStatus === 'pending' ? 'Registrar pedido' : 'Finalizar venda'}
             </Button>
           </DialogFooter>
         </form>

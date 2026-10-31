@@ -17,7 +17,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { productSchema } from '@/lib/validations/schemas';
@@ -45,6 +45,8 @@ type ProductFormValues = Omit<Product, 'id'>;
 
 export function ProductModal({ open, onOpenChange, productToEdit }: ProductModalProps) {
   const { addProduct, updateProduct } = useApp();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const {
     register,
@@ -88,23 +90,52 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
     }
   }, [open, productToEdit, reset]);
 
-  const onSubmit = (data: ProductFormValues) => {
-    if (productToEdit) {
-      updateProduct(productToEdit.id, data);  // Atualiza existente
-    } else {
-      addProduct(data);                        // Insere novo
+  const onSubmit = async (data: ProductFormValues) => {
+    setSubmitError(null);
+    setIsSaving(true);
+
+    try {
+      let result: { error: string | null };
+
+      if (productToEdit) {
+        // Estoque não é alterado pela edição do catálogo. Toda movimentação
+        // deve passar pelo módulo Estoque para preservar consistência.
+        const { stock: _stock, ...catalogData } = data;
+        result = await updateProduct(productToEdit.id, catalogData);
+      } else {
+        result = await addProduct(data);
+      }
+
+      if (result.error) {
+        setSubmitError(result.error);
+        return;
+      }
+
+      onOpenChange(false);
+    } finally {
+      setIsSaving(false);
     }
-    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setSubmitError(null);
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{productToEdit ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+          {submitError && (
+            <p className="rounded-xl bg-destructive/10 p-3 text-sm font-medium text-destructive">
+              {submitError}
+            </p>
+          )}
           {/* Linha 1: Nome e SKU */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
@@ -173,27 +204,37 @@ export function ProductModal({ open, onOpenChange, productToEdit }: ProductModal
               )}
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="stock">Estoque Inicial</Label>
-              <Input
-                id="stock"
-                type="number"
-                placeholder="0"
-                {...register('stock', { valueAsNumber: true })}
-              />
-              {errors.stock && (
-                <p className="text-xs font-semibold text-destructive">{errors.stock.message}</p>
-              )}
-            </div>
+            {productToEdit ? (
+              <div className="space-y-1">
+                <Label>Estoque atual</Label>
+                <div className="rounded-md border border-input bg-muted/40 px-3 py-2 text-sm font-semibold">
+                  {productToEdit.stock} unidade(s)
+                </div>
+                <p className="text-xs text-muted-foreground">Ajuste a quantidade pelo módulo Estoque.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label htmlFor="stock">Estoque inicial</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  placeholder="0"
+                  {...register('stock', { valueAsNumber: true })}
+                />
+                {errors.stock && (
+                  <p className="text-xs font-semibold text-destructive">{errors.stock.message}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Botões */}
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => { setSubmitError(null); onOpenChange(false); }}>
               Cancelar
             </Button>
-            <Button type="submit">
-              {productToEdit ? 'Salvar Alterações' : 'Cadastrar Produto'}
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? 'Salvando...' : productToEdit ? 'Salvar alterações' : 'Cadastrar produto'}
             </Button>
           </DialogFooter>
         </form>

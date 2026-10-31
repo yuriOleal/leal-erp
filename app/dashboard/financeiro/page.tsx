@@ -1,94 +1,125 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApp } from '@/lib/context/AppContext';
-import { TrendingUp, TrendingDown, DollarSign, Wallet, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Plus, MoreHorizontal, Trash2, ReceiptText, Search, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { TransactionModal } from '@/components/modals/transaction-modal';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { PageHeader } from '@/components/page-header';
+import { MetricCard } from '@/components/metric-card';
+import { EmptyState } from '@/components/empty-state';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
-export default function FinanceiroPage() {
-  const { transactions } = useApp();
+function FinanceiroPageContent() {
+  const { transactions, deleteTransaction } = useApp();
+  const searchParams = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('busca') ?? '');
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
+  const filteredTransactions = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return transactions;
+
+    return transactions.filter(transaction =>
+      transaction.description.toLowerCase().includes(query) ||
+      transaction.category.toLowerCase().includes(query)
+    );
+  }, [transactions, searchTerm]);
 
   const totalIncome = transactions
-    .filter(t => t.type === 'income')
-    .reduce((acc, t) => acc + t.amount, 0);
+    .filter(transaction => transaction.type === 'income')
+    .reduce((total, transaction) => total + transaction.amount, 0);
 
   const totalExpense = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, t) => acc + t.amount, 0);
+    .filter(transaction => transaction.type === 'expense')
+    .reduce((total, transaction) => total + transaction.amount, 0);
 
   const balance = totalIncome - totalExpense;
 
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este lançamento financeiro?')) return;
+
+    const result = await deleteTransaction(id);
+    setErrorMsg(result.error);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Financeiro</h2>
-          <p className="text-muted-foreground">Gestão financeira e fluxo de caixa</p>
-        </div>
-        <Button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-          <Plus className="mr-2 h-4 w-4" /> Registrar Lançamento
-        </Button>
+      <PageHeader
+        eyebrow="Caixa"
+        title="Financeiro"
+        description="Acompanhe entradas, saídas, saldo e lançamentos para manter a saúde financeira visível."
+        actions={
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Registrar lançamento
+          </Button>
+        }
+      />
+
+      {errorMsg && (
+        <p className="rounded-2xl bg-destructive/10 p-3 text-sm font-medium text-destructive">
+          {errorMsg}
+        </p>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Saldo atual"
+          value={formatCurrency(balance)}
+          description="Resultado acumulado dos lançamentos."
+          icon={Wallet}
+          tone={balance >= 0 ? 'green' : 'rose'}
+        />
+        <MetricCard
+          label="Receitas"
+          value={formatCurrency(totalIncome)}
+          description="Total de entradas registradas."
+          icon={TrendingUp}
+          tone="green"
+        />
+        <MetricCard
+          label="Despesas"
+          value={formatCurrency(totalExpense)}
+          description="Total de saídas registradas."
+          icon={TrendingDown}
+          tone={totalExpense > 0 ? 'amber' : 'slate'}
+        />
+        <MetricCard
+          label="Lançamentos"
+          value={transactions.length}
+          description="Movimentações no histórico."
+          icon={ReceiptText}
+          tone="slate"
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Atual</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
-              {formatCurrency(balance)}
+      <Card className="border-white/70 bg-white/80 shadow-sm shadow-slate-200/60 dark:border-white/10 dark:bg-slate-900/55 dark:shadow-none">
+        <CardHeader className="border-b pb-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Histórico financeiro</CardTitle>
+              <CardDescription>Fluxo de caixa recente com receitas e despesas.</CardDescription>
             </div>
-            <p className="text-xs text-muted-foreground">Fechamento acumulado</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receitas (Total)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalIncome)}</div>
-            <p className="text-xs text-muted-foreground">+12% em relação ao último mês</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas (Total)</CardTitle>
-            <TrendingDown className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">{formatCurrency(totalExpense)}</div>
-            <p className="text-xs text-muted-foreground">-2% em relação ao último mês</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(balance)}</div>
-            <p className="text-xs text-muted-foreground">Margem calculada em tempo real</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico de Transações</CardTitle>
-          <CardDescription>Fluxo de caixa recente detalhado</CardDescription>
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por descrição ou categoria..."
+                className="h-10 rounded-xl bg-background pl-9"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="overflow-x-auto p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -96,23 +127,57 @@ export default function FinanceiroPage() {
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell>{new Date(tx.date).toLocaleDateString('pt-BR')}</TableCell>
-                  <TableCell className="font-medium">{tx.description}</TableCell>
-                  <TableCell>{tx.category}</TableCell>
-                  <TableCell className={`text-right font-semibold ${tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+              {filteredTransactions.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell>{formatDate(transaction.date)}</TableCell>
+                  <TableCell className="font-semibold">{transaction.description}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                      {transaction.category}
+                    </span>
+                  </TableCell>
+                  <TableCell className={`text-right font-bold ${transaction.type === 'income' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'}`}>
+                    {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-accent hover:text-accent-foreground">
+                        <span className="sr-only">Abrir menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDeleteTransaction(transaction.id)} className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
-              {transactions.length === 0 && (
+              {filteredTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
-                    Nenhum lançamento financeiro registrado.
+                  <TableCell colSpan={5}>
+                    <EmptyState
+                      icon={Landmark}
+                      title={transactions.length === 0 ? 'Nenhum lançamento financeiro' : 'Nenhum lançamento encontrado'}
+                      description={
+                        transactions.length === 0
+                          ? 'Registre receitas e despesas para acompanhar saldo, lucro e fluxo de caixa.'
+                          : 'Tente buscar por outra descrição ou categoria.'
+                      }
+                      action={
+                        transactions.length === 0 ? (
+                          <Button size="sm" onClick={() => setIsModalOpen(true)}>
+                            Registrar lançamento
+                          </Button>
+                        ) : undefined
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               )}
@@ -121,10 +186,18 @@ export default function FinanceiroPage() {
         </CardContent>
       </Card>
 
-      <TransactionModal 
-        open={isModalOpen} 
-        onOpenChange={setIsModalOpen} 
+      <TransactionModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
       />
     </div>
+  );
+}
+
+export default function FinanceiroPage() {
+  return (
+    <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-muted/60" />}>
+      <FinanceiroPageContent />
+    </Suspense>
   );
 }

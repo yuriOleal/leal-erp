@@ -1,589 +1,352 @@
 'use client';
 
-import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { 
-  ArrowRight, 
-  Check, 
-  ChevronDown, 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  Shield, 
-  Zap, 
-  BarChart3, 
-  Layers, 
-  Package, 
-  FileText,
-  Star,
-  Activity,
-  Menu,
-  X
-} from 'lucide-react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  ArrowRight,
+  BarChart3,
+  Boxes,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  FileDown,
+  Menu,
+  ShieldCheck,
+  ShoppingCart,
+  X,
+} from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
+import { Button } from '@/components/ui/button';
+
+const benefits = [
+  {
+    icon: ShoppingCart,
+    title: 'Venda sem perder o controle',
+    description: 'Registre pedidos, confira itens e atualize o estoque no mesmo fluxo.',
+    accent: 'bg-[#e9f3ef] text-[#123c32]',
+  },
+  {
+    icon: Boxes,
+    title: 'Estoque que acompanha a operação',
+    description: 'Visualize saldo, custo, reposição e produtos críticos sem depender de planilhas.',
+    accent: 'bg-[#fff2dc] text-[#8a5516]',
+  },
+  {
+    icon: CircleDollarSign,
+    title: 'Financeiro ligado ao que acontece',
+    description: 'Receitas e despesas aparecem de forma clara, com histórico rastreável.',
+    accent: 'bg-[#f0eee9] text-[#3f4542]',
+  },
+];
+
+const faqs = [
+  {
+    question: 'O Leal ERP já pode ser usado por uma empresa real?',
+    answer:
+      'Sim. O sistema já cobre clientes, produtos, vendas, estoque, financeiro e relatórios. Novos recursos serão adicionados de forma gradual, sem prometer funcionalidades que ainda não existem.',
+  },
+  {
+    question: 'Para qual tipo de negócio ele é mais indicado?',
+    answer:
+      'A experiência atual foi pensada principalmente para comércios e pequenas distribuidoras que precisam conectar vendas, estoque e caixa em uma operação simples.',
+  },
+  {
+    question: 'Os dados ficam separados por conta?',
+    answer:
+      'Sim. A aplicação utiliza autenticação e políticas de acesso no Supabase para manter os dados de cada usuário isolados.',
+  },
+  {
+    question: 'Consigo exportar minhas informações?',
+    answer:
+      'Sim. Os relatórios podem ser exportados em CSV e preparados para impressão ou PDF diretamente pelo navegador.',
+  },
+];
+
+const productModules = [
+  { icon: ShoppingCart, label: 'Vendas', text: 'Pedidos e detalhes dos itens' },
+  { icon: Boxes, label: 'Estoque', text: 'Entradas, saídas e reposição' },
+  { icon: BarChart3, label: 'Indicadores', text: 'Visão financeira e operacional' },
+  { icon: FileDown, label: 'Relatórios', text: 'CSV, impressão e PDF' },
+];
 
 export default function LandingPage() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeFaq, setActiveFaq] = useState<number | null>(null);
-
-  const toggleFaq = (index: number) => {
-    setActiveFaq(activeFaq === index ? null : index);
-  };
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(0);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-indigo-500 selection:text-white">
-      {/* Background Orbs */}
-      <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-3xl -translate-y-1/2 pointer-events-none" />
-      <div className="absolute top-[1000px] right-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-20 left-10 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+    <main className="min-h-screen overflow-hidden bg-[#f5f1e8] text-[#18332c] selection:bg-[#d8a755] selection:text-[#18332c]">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#102d27]/90 text-white backdrop-blur-xl">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
+          <Link href="/" aria-label="Leal ERP — início">
+            <BrandLogo inverted />
+          </Link>
 
-      {/* Navigation Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-indigo-600/20">
-              L
-            </div>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-              Leal ERP
-            </span>
-          </div>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-            <a href="#beneficios" className="hover:text-white transition-colors">Benefícios</a>
-            <a href="#como-funciona" className="hover:text-white transition-colors">Funcionamento</a>
-            <a href="#diferenciais" className="hover:text-white transition-colors">Diferenciais</a>
-            <a href="#precos" className="hover:text-white transition-colors">Preços</a>
-            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
+          <nav className="hidden items-center gap-8 text-sm font-medium text-white/65 lg:flex">
+            <a className="transition-colors hover:text-white" href="#produto">Produto</a>
+            <a className="transition-colors hover:text-white" href="#como-funciona">Como funciona</a>
+            <a className="transition-colors hover:text-white" href="#seguranca">Segurança</a>
+            <a className="transition-colors hover:text-white" href="#faq">Dúvidas</a>
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden items-center gap-3 lg:flex">
             <Link href="/login">
-              <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-slate-800">
-                Acessar Conta
+              <Button variant="ghost" className="text-white/80 hover:bg-white/10 hover:text-white">
+                Entrar
               </Button>
             </Link>
             <Link href="/login">
-              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-600/25 transition-all">
-                Iniciar Demo Grátis
+              <Button className="rounded-full bg-[#e8a84c] px-6 font-semibold text-[#17352d] hover:bg-[#f2ba68]">
+                Criar conta
               </Button>
             </Link>
           </div>
 
-          <button 
-            className="md:hidden text-slate-300 hover:text-white"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          <button
+            type="button"
+            aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+            className="rounded-full p-2 text-white lg:hidden"
+            onClick={() => setMenuOpen(value => !value)}
           >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {menuOpen ? <X /> : <Menu />}
           </button>
         </div>
+
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.nav
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="border-t border-white/10 bg-[#102d27] px-5 py-6 lg:hidden"
+            >
+              <div className="flex flex-col gap-5">
+                {[
+                  ['Produto', '#produto'],
+                  ['Como funciona', '#como-funciona'],
+                  ['Segurança', '#seguranca'],
+                  ['Dúvidas', '#faq'],
+                ].map(([label, href]) => (
+                  <a key={href} href={href} onClick={() => setMenuOpen(false)} className="text-white/75">
+                    {label}
+                  </a>
+                ))}
+                <Link href="/login" onClick={() => setMenuOpen(false)}>
+                  <Button className="w-full bg-[#e8a84c] text-[#17352d]">Acessar o Leal ERP</Button>
+                </Link>
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </header>
 
-      {/* Mobile Navigation Dropdown */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="md:hidden fixed top-18 left-0 w-full bg-slate-900 border-b border-slate-800 z-40 px-6 py-8 space-y-6 flex flex-col"
-          >
-            <a href="#beneficios" onClick={() => setIsMenuOpen(false)} className="text-lg text-slate-300 hover:text-white">Benefícios</a>
-            <a href="#como-funciona" onClick={() => setIsMenuOpen(false)} className="text-lg text-slate-300 hover:text-white">Funcionamento</a>
-            <a href="#diferenciais" onClick={() => setIsMenuOpen(false)} className="text-lg text-slate-300 hover:text-white">Diferenciais</a>
-            <a href="#precos" onClick={() => setIsMenuOpen(false)} className="text-lg text-slate-300 hover:text-white">Preços</a>
-            <a href="#faq" onClick={() => setIsMenuOpen(false)} className="text-lg text-slate-300 hover:text-white">FAQ</a>
-            <div className="h-px bg-slate-800 w-full" />
-            <div className="flex flex-col gap-4">
-              <Link href="/login" onClick={() => setIsMenuOpen(false)}>
-                <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800">
-                  Acessar Conta
+      <section className="relative min-h-[850px] bg-[#102d27] pt-20 text-white lg:min-h-[900px]">
+        <Image
+          src="/images/leal-operations-hero.png"
+          alt="Estoque organizado com bancada de operação, notebook e leitor de código de barras"
+          fill
+          priority
+          className="object-cover object-[62%_center] opacity-80"
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#102d27_0%,rgba(16,45,39,.97)_35%,rgba(16,45,39,.35)_72%,rgba(16,45,39,.08)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_60%,#102d27_100%)]" />
+
+        <div className="relative mx-auto flex min-h-[780px] max-w-7xl items-center px-5 py-24 sm:px-8 lg:min-h-[820px]">
+          <div className="max-w-2xl">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-7 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#f0c985]"
+            >
+              <span className="h-px w-10 bg-[#e8a84c]" aria-hidden="true" />
+              Feito para operações que precisam fluir
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.08 }}
+              className="max-w-xl text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-[76px]"
+            >
+              Sua empresa em ordem. Suas decisões mais claras.
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.16 }}
+              className="mt-7 max-w-xl text-lg leading-8 text-white/68"
+            >
+              Vendas, estoque, clientes e financeiro conectados em um sistema direto ao ponto,
+              pensado para pequenos comércios e distribuidoras.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.24 }}
+              className="mt-9 flex flex-col gap-3 sm:flex-row"
+            >
+              <Link href="/login">
+                <Button size="lg" className="h-13 rounded-full bg-[#e8a84c] px-7 font-semibold text-[#17352d] hover:bg-[#f2ba68]">
+                  Conhecer o sistema
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/login" onClick={() => setIsMenuOpen(false)}>
-                <Button className="w-full bg-indigo-600 text-white">
-                  Iniciar Demo Grátis
+              <a href="#produto">
+                <Button size="lg" variant="outline" className="h-13 rounded-full border-white/25 bg-white/5 px-7 text-white hover:bg-white/10 hover:text-white">
+                  Ver o que ele resolve
                 </Button>
-              </Link>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </a>
+            </motion.div>
 
-      {/* Hero Section */}
-      <section className="relative pt-20 pb-28 px-6">
-        <div className="max-w-7xl mx-auto text-center space-y-8 flex flex-col items-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 text-xs font-semibold"
-          >
-            <Zap className="h-3.5 w-3.5" />
-            SaaS ERP de Nova Geração
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl sm:text-6xl font-black tracking-tight max-w-4xl leading-tight bg-gradient-to-b from-white via-slate-100 to-slate-400 bg-clip-text text-transparent"
-          >
-            Controle total do seu negócio em uma única tela de alta performance
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-slate-400 text-lg sm:text-xl max-w-2xl font-normal leading-relaxed"
-          >
-            Automatize seu financeiro, controle o estoque físico em tempo real, registre suas vendas de forma inteligente e tome decisões estratégicas com relatórios instantâneos.
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
-          >
-            <Link href="/login">
-              <Button size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-6 rounded-xl shadow-xl shadow-indigo-600/20 text-md gap-2 transition-all group">
-                Acessar ERP (Demo Grátis)
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Button>
-            </Link>
-            <a href="#beneficios">
-              <Button size="lg" variant="outline" className="border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold px-8 py-6 rounded-xl text-md">
-                Conhecer Recursos
-              </Button>
-            </a>
-          </motion.div>
-
-          {/* Premium Mock Dashboard Preview (Interactive Style) */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4, type: 'spring' }}
-            className="w-full max-w-5xl mt-12 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative"
-          >
-            {/* Header window control */}
-            <div className="bg-slate-900/60 px-4 py-3 border-b border-slate-800/80 flex items-center justify-between">
-              <div className="flex gap-1.5">
-                <span className="w-3.5 h-3.5 rounded-full bg-rose-500/80 inline-block" />
-                <span className="w-3.5 h-3.5 rounded-full bg-amber-500/80 inline-block" />
-                <span className="w-3.5 h-3.5 rounded-full bg-emerald-500/80 inline-block" />
-              </div>
-              <span className="text-xs text-slate-500 font-mono">dashboard.lealerp.com.br</span>
-              <span className="w-10" />
-            </div>
-
-            {/* Dashboard Mock Body */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-950 text-left">
-              {/* Sidebar */}
-              <div className="hidden md:flex flex-col gap-2 border-r border-slate-900 pr-4">
-                <span className="h-7 w-28 bg-slate-800/80 rounded" />
-                <div className="h-px bg-slate-900 my-2" />
-                <span className="h-8 bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 rounded-lg px-2 flex items-center text-xs font-semibold">Dashboard</span>
-                <span className="h-8 bg-slate-900 rounded-lg px-2 flex items-center text-xs text-slate-400">Clientes</span>
-                <span className="h-8 bg-slate-900 rounded-lg px-2 flex items-center text-xs text-slate-400">Produtos</span>
-                <span className="h-8 bg-slate-900 rounded-lg px-2 flex items-center text-xs text-slate-400">Estoque</span>
-                <span className="h-8 bg-slate-900 rounded-lg px-2 flex items-center text-xs text-slate-400">Vendas</span>
-              </div>
-
-              {/* Main Content Pane */}
-              <div className="md:col-span-3 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="h-5 w-24 bg-slate-800 rounded" />
-                    <div className="h-3 w-36 bg-slate-900 rounded mt-2" />
-                  </div>
-                  <span className="h-8 w-20 bg-indigo-600 rounded-lg" />
-                </div>
-
-                {/* Cards row */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/60">
-                    <span className="h-3 w-16 bg-slate-800 rounded block" />
-                    <span className="h-6 w-24 bg-slate-700 rounded block mt-2" />
-                  </div>
-                  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/60">
-                    <span className="h-3 w-16 bg-slate-800 rounded block" />
-                    <span className="h-6 w-24 bg-emerald-500/20 rounded block mt-2 text-emerald-400 text-sm font-semibold flex items-center justify-center">R$ 45.000</span>
-                  </div>
-                  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/60">
-                    <span className="h-3 w-16 bg-slate-800 rounded block" />
-                    <span className="h-6 w-12 bg-slate-700 rounded block mt-2" />
-                  </div>
-                </div>
-
-                {/* Simulated Chart */}
-                <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-4 h-48 flex items-end gap-3.5">
-                  <div className="w-full bg-slate-800/50 rounded-t h-[30%]" />
-                  <div className="w-full bg-slate-800/50 rounded-t h-[45%]" />
-                  <div className="w-full bg-slate-800/50 rounded-t h-[60%]" />
-                  <div className="w-full bg-slate-800/50 rounded-t h-[50%]" />
-                  <div className="w-full bg-indigo-600/80 rounded-t h-[85%]" />
-                  <div className="w-full bg-slate-800/50 rounded-t h-[70%]" />
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Trust & Indicators Section */}
-      <section className="bg-slate-950 border-y border-slate-800 py-16 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          <div className="space-y-2">
-            <h3 className="text-3xl font-black text-white">+10.000</h3>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Empresas Geridas</p>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-3xl font-black text-white">R$ 2B+</h3>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Transacionados</p>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-3xl font-black text-white">99.99%</h3>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Uptime Garantido</p>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-3xl font-black text-white">4.9 / 5</h3>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avaliação Média</p>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm text-white/55"
+            >
+              {['Sem cartão para começar', 'Dados isolados por conta', 'Exportação disponível'].map(item => (
+                <span key={item} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-[#e8a84c]" />
+                  {item}
+                </span>
+              ))}
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section id="beneficios" className="py-24 px-6 max-w-7xl mx-auto space-y-16">
-        <div className="text-center max-w-2xl mx-auto space-y-4">
-          <h2 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400">Recursos e Benefícios</h2>
-          <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Desenvolvido para acelerar sua gestão</h3>
-          <p className="text-slate-400 leading-relaxed">
-            Elimine planilhas manuais bagunçadas. O Leal ERP unifica todas as pontas da sua operação em fluxos eficientes e integrados.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Card 1: Finance */}
-          <motion.div 
-            whileHover={{ y: -8 }}
-            className="bg-slate-950 border border-slate-800 p-8 rounded-2xl space-y-4 hover:border-indigo-500/50 transition-all"
-          >
-            <div className="h-12 w-12 rounded-xl bg-indigo-600/10 text-indigo-400 flex items-center justify-center">
-              <DollarSign className="h-6 w-6" />
-            </div>
-            <h4 className="text-xl font-bold text-white">Financeiro Automatizado</h4>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Monitore saldo real, receitas e despesas automaticamente. Sem complicação de cálculos fiscais ou erros manuais.
-            </p>
-          </motion.div>
-
-          {/* Card 2: Inventory */}
-          <motion.div 
-            whileHover={{ y: -8 }}
-            className="bg-slate-950 border border-slate-800 p-8 rounded-2xl space-y-4 hover:border-indigo-500/50 transition-all"
-          >
-            <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <Package className="h-6 w-6" />
-            </div>
-            <h4 className="text-xl font-bold text-white">Estoque Inteligente</h4>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Saiba exatamente quando reabastecer com alertas de estoque crítico e baixas automáticas a cada venda efetuada.
-            </p>
-          </motion.div>
-
-          {/* Card 3: Reports */}
-          <motion.div 
-            whileHover={{ y: -8 }}
-            className="bg-slate-950 border border-slate-800 p-8 rounded-2xl space-y-4 hover:border-indigo-500/50 transition-all"
-          >
-            <div className="h-12 w-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-              <BarChart3 className="h-6 w-6" />
-            </div>
-            <h4 className="text-xl font-bold text-white">Relatórios Gerenciais</h4>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Exporte dados em PDF ou CSV com apenas um clique. Monitore lucros e crescimento em painéis interativos.
-            </p>
-          </motion.div>
+      <section id="produto" className="relative z-10 -mt-20 px-5 sm:px-8">
+        <div className="mx-auto max-w-7xl rounded-[32px] border border-[#d9d4ca] bg-[#fbfaf6] p-6 shadow-[0_24px_70px_rgba(18,60,50,.13)] sm:p-9">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {productModules.map(module => (
+              <div key={module.label} className="rounded-2xl border border-[#e6e0d6] bg-white p-5">
+                <module.icon className="mb-8 h-5 w-5 text-[#1c5b4d]" />
+                <p className="font-semibold">{module.label}</p>
+                <p className="mt-1 text-sm leading-6 text-[#68736f]">{module.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* How it Works Section */}
-      <section id="como-funciona" className="bg-slate-950/50 py-24 px-6 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto space-y-16">
-          <div className="text-center max-w-2xl mx-auto space-y-4">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400">Fluxo Simples</h2>
-            <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Sua empresa rodando em 3 passos</h3>
-            <p className="text-slate-400 leading-relaxed">
-              O design limpo e intuitivo reduz a curva de aprendizado da equipe a praticamente zero.
+      <section className="mx-auto max-w-7xl px-5 py-28 sm:px-8">
+        <div className="grid items-start gap-16 lg:grid-cols-[.85fr_1.15fr]">
+          <div className="lg:sticky lg:top-28">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#a66c22]">Menos improviso</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
+              O básico bem conectado muda a rotina inteira.
+            </h2>
+            <p className="mt-6 max-w-lg text-lg leading-8 text-[#68736f]">
+              O Leal ERP não tenta esconder complexidade com enfeites. Ele organiza os pontos que mais
+              consomem tempo em uma operação pequena.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-indigo-500/5 via-indigo-500/20 to-indigo-500/5 -translate-y-1/2 hidden md:block" />
-            
-            {/* Step 1 */}
-            <div className="space-y-4 text-center z-10">
-              <div className="h-12 w-12 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg mx-auto shadow-lg shadow-indigo-600/35">
-                1
-              </div>
-              <h4 className="text-lg font-bold text-white">Importe ou Cadastre</h4>
-              <p className="text-slate-400 text-xs leading-relaxed max-w-xs mx-auto">
-                Cadastre clientes, insira produtos, defina preços de custo, preços de venda e quantidade em estoque.
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="space-y-4 text-center z-10">
-              <div className="h-12 w-12 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg mx-auto shadow-lg shadow-indigo-600/35">
-                2
-              </div>
-              <h4 className="text-lg font-bold text-white">Registre Transações</h4>
-              <p className="text-slate-400 text-xs leading-relaxed max-w-xs mx-auto">
-                Registre as vendas no pdv digital. O sistema calcula o total e atualiza as receitas e o estoque automaticamente.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="space-y-4 text-center z-10">
-              <div className="h-12 w-12 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg mx-auto shadow-lg shadow-indigo-600/35">
-                3
-              </div>
-              <h4 className="text-lg font-bold text-white">Monitore e Lucre</h4>
-              <p className="text-slate-400 text-xs leading-relaxed max-w-xs mx-auto">
-                Acompanhe gráficos mensais de fluxo de caixa e exporte relatórios para contabilidade em tempo recorde.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Competive Differentiators Grid */}
-      <section id="diferenciais" className="py-24 px-6 max-w-7xl mx-auto space-y-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400">Segurança & Performance</h2>
-            <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Feito para suportar o crescimento da sua empresa</h3>
-            <p className="text-slate-400 leading-relaxed text-sm">
-              Mais do que um ERP básico, o Leal ERP utiliza tecnologia de ponta para garantir carregamentos rápidos, segurança militar de dados e auditoria contínua de movimentações.
-            </p>
-            
-            <ul className="space-y-3.5">
-              <li className="flex items-center gap-3 text-sm">
-                <div className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5" />
-                </div>
-                <span>Autenticação de usuários criptografada</span>
-              </li>
-              <li className="flex items-center gap-3 text-sm">
-                <div className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5" />
-                </div>
-                <span>Histórico de transações imutável para contabilidade</span>
-              </li>
-              <li className="flex items-center gap-3 text-sm">
-                <div className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5" />
-                </div>
-                <span>Exportação para múltiplos formatos (Excel, PDF)</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 space-y-2">
-              <Shield className="h-7 w-7 text-indigo-400" />
-              <h4 className="text-md font-bold text-white">LGPD Compliance</h4>
-              <p className="text-slate-400 text-xs">Dados e cadastros de clientes 100% protegidos.</p>
-            </div>
-            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 space-y-2">
-              <Activity className="h-7 w-7 text-emerald-400" />
-              <h4 className="text-md font-bold text-white">Fast-Load</h4>
-              <p className="text-slate-400 text-xs">Infraestrutura Next.js de carregamento instantâneo.</p>
-            </div>
-            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 space-y-2">
-              <Layers className="h-7 w-7 text-purple-400" />
-              <h4 className="text-md font-bold text-white">API Pronta</h4>
-              <p className="text-slate-400 text-xs">Fácil integração com outros canais de vendas (SaaS).</p>
-            </div>
-            <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 space-y-2">
-              <Users className="h-7 w-7 text-amber-400" />
-              <h4 className="text-md font-bold text-white">Multi-Usuários</h4>
-              <p className="text-slate-400 text-xs">Criação de perfis distintos com níveis de acesso.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="bg-slate-950/40 py-24 px-6 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto space-y-16">
-          <div className="text-center max-w-2xl mx-auto space-y-4">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400">Depoimentos</h2>
-            <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">O que dizem os donos de negócios</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-slate-950 p-8 rounded-xl border border-slate-800 space-y-4">
-              <div className="flex text-amber-400">
-                {[...Array(5)].map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
-              </div>
-              <p className="text-slate-300 text-sm italic">
-                &quot;Substituímos três planilhas financeiras complexas pelo Leal ERP. Hoje minha equipe faz vendas e dá baixa no estoque de forma instantânea. O faturamento subiu 15%!&quot;
-              </p>
-              <div>
-                <p className="text-sm font-bold text-white">Gustavo Pinheiro</p>
-                <p className="text-xs text-slate-500">CEO, Pinheiro Imports</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-950 p-8 rounded-xl border border-slate-800 space-y-4">
-              <div className="flex text-amber-400">
-                {[...Array(5)].map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
-              </div>
-              <p className="text-slate-300 text-sm italic">
-                &quot;O controle de estoque crítico mudou nossa forma de operar. Nunca mais perdemos vendas por falta de mercadoria nas prateleiras ou atraso de fornecedor.&quot;
-              </p>
-              <div>
-                <p className="text-sm font-bold text-white">Carla Vasconcelos</p>
-                <p className="text-xs text-slate-500">Diretora de Logística, Casa & Cozinha</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-950 p-8 rounded-xl border border-slate-800 space-y-4">
-              <div className="flex text-amber-400">
-                {[...Array(5)].map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
-              </div>
-              <p className="text-slate-300 text-sm italic">
-                &quot;Gostei muito da simplicidade do sistema. Em menos de 20 minutos conseguimos cadastrar toda a carteira de clientes ativos e emitir as vendas pendentes.&quot;
-              </p>
-              <div>
-                <p className="text-sm font-bold text-white">Márcio Sant&apos;Anna</p>
-                <p className="text-xs text-slate-500">Fundador, Sant&apos;Anna Solutions</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="precos" className="py-24 px-6 max-w-7xl mx-auto space-y-16">
-        <div className="text-center max-w-2xl mx-auto space-y-4">
-          <h2 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400">Planos de Assinatura</h2>
-          <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Planos transparentes e sem pegadinhas</h3>
-          <p className="text-slate-400 leading-relaxed">
-            Comece a usar grátis em nosso ambiente de testes e escolha o plano ideal para sua escala operacional.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Plan 1 */}
-          <div className="bg-slate-950 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between">
-            <div className="space-y-4">
-              <h4 className="text-lg font-bold text-slate-400">Starter</h4>
-              <p className="text-xs text-slate-500">Ideal para MEIs e pequenos autônomos</p>
-              <div className="text-3xl font-black text-white">Grátis <span className="text-sm font-normal text-slate-500">/ sempre</span></div>
-              <div className="h-px bg-slate-900 my-4" />
-              <ul className="space-y-3.5 text-sm text-slate-400">
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Até 50 clientes ativos</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Controle básico de estoque</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Registro de até 100 vendas/mês</li>
-              </ul>
-            </div>
-            <Link href="/login" className="mt-8">
-              <Button className="w-full border border-slate-700 bg-transparent hover:bg-slate-800 text-white py-5">Começar Agora</Button>
-            </Link>
-          </div>
-
-          {/* Plan 2: Best Value */}
-          <div className="bg-slate-950 border-2 border-indigo-600 p-8 rounded-2xl flex flex-col justify-between relative shadow-xl shadow-indigo-600/10">
-            <span className="absolute -top-3.5 right-6 bg-indigo-600 text-white text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full">Mais Vendido</span>
-            <div className="space-y-4">
-              <h4 className="text-lg font-bold text-indigo-400">Pro Business</h4>
-              <p className="text-xs text-slate-500">Para empresas em rápido crescimento</p>
-              <div className="text-3xl font-black text-white">R$ 149 <span className="text-sm font-normal text-slate-500">/ mês</span></div>
-              <div className="h-px bg-slate-900 my-4" />
-              <ul className="space-y-3.5 text-sm text-slate-400">
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Clientes e produtos ilimitados</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Alertas avançados de estoque crítico</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Relatórios gerenciais e fluxo de caixa</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Suporte prioritário via WhatsApp</li>
-              </ul>
-            </div>
-            <Link href="/login" className="mt-8">
-              <Button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-5">Contratar Plano Pro</Button>
-            </Link>
-          </div>
-
-          {/* Plan 3 */}
-          <div className="bg-slate-950 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between">
-            <div className="space-y-4">
-              <h4 className="text-lg font-bold text-slate-400">Corporate</h4>
-              <p className="text-xs text-slate-500">Para operações complexas e customizadas</p>
-              <div className="text-3xl font-black text-white">Sob consulta</div>
-              <div className="h-px bg-slate-900 my-4" />
-              <ul className="space-y-3.5 text-sm text-slate-400">
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Integração customizada via API</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Níveis avançados de acessos e cargos</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-indigo-400" /> Gerente de conta dedicado</li>
-              </ul>
-            </div>
-            <Link href="/login" className="mt-8">
-              <Button className="w-full border border-slate-700 bg-transparent hover:bg-slate-800 text-white py-5">Falar com Consultor</Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-24 px-6 max-w-4xl mx-auto space-y-16">
-        <div className="text-center space-y-4">
-          <h2 className="text-xs font-extrabold uppercase tracking-widest text-indigo-400">Perguntas Frequentes</h2>
-          <h3 className="text-3xl font-extrabold tracking-tight">Tire suas dúvidas</h3>
-        </div>
-
-        <div className="space-y-4">
-          {[
-            {
-              q: "Preciso de cartão de crédito para testar?",
-              a: "Não. Você pode acessar nosso painel de demonstração gratuitamente de forma imediata apenas clicando no botão de login administrativo."
-            },
-            {
-              q: "Os dados ficam armazenados na nuvem de forma segura?",
-              a: "Sim. Nossos servidores de banco de dados corporativos operam com criptografia AES-256 e backups automáticos diários redundantes na AWS."
-            },
-            {
-              q: "É possível migrar dados de outro ERP ou planilhas?",
-              a: "Com certeza. O Leal ERP possui ferramentas de importação em lote compatíveis com CSV e planilhas comuns do Excel para acelerar seu setup."
-            },
-            {
-              q: "Posso cancelar minha assinatura a qualquer momento?",
-              a: "Sim. Não exigimos contratos de fidelidade. Você pode assinar mensalmente e cancelar sua assinatura diretamente no painel de configurações."
-            }
-          ].map((item, index) => (
-            <div key={index} className="bg-slate-950 border border-slate-800/80 rounded-xl overflow-hidden">
-              <button 
-                className="w-full p-6 text-left flex justify-between items-center hover:bg-slate-900/60 transition-colors"
-                onClick={() => toggleFaq(index)}
+          <div className="grid gap-5">
+            {benefits.map((benefit, index) => (
+              <motion.article
+                key={benefit.title}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-80px' }}
+                transition={{ delay: index * 0.08 }}
+                className="grid gap-5 rounded-[28px] border border-[#ded8cd] bg-[#fbfaf6] p-7 sm:grid-cols-[64px_1fr] sm:p-9"
               >
-                <span className="font-bold text-white text-md">{item.q}</span>
-                <ChevronDown className={`h-5 w-5 text-slate-400 transition-transform duration-200 ${activeFaq === index ? 'rotate-180 text-white' : ''}`} />
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${benefit.accent}`}>
+                  <benefit.icon className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-semibold tracking-[-0.03em]">{benefit.title}</h3>
+                  <p className="mt-3 max-w-xl leading-7 text-[#68736f]">{benefit.description}</p>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="como-funciona" className="bg-[#e8e3d9] px-5 py-28 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#a66c22]">Um fluxo coerente</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
+              A venda acontece uma vez. O sistema organiza o restante.
+            </h2>
+          </div>
+
+          <div className="mt-16 grid gap-px overflow-hidden rounded-[28px] border border-[#cec8bd] bg-[#cec8bd] lg:grid-cols-3">
+            {[
+              ['01', 'Cadastre sua base', 'Clientes e produtos entram com informações claras e validações úteis.'],
+              ['02', 'Registre a operação', 'Cada venda guarda itens, valores, cliente e data para consulta posterior.'],
+              ['03', 'Acompanhe o resultado', 'Estoque, caixa e relatórios refletem os dados registrados no sistema.'],
+            ].map(([number, title, text]) => (
+              <div key={number} className="bg-[#f5f1e8] p-8 sm:p-10">
+                <span className="text-sm font-semibold text-[#a66c22]">{number}</span>
+                <h3 className="mt-16 text-2xl font-semibold tracking-[-0.03em]">{title}</h3>
+                <p className="mt-3 leading-7 text-[#68736f]">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="seguranca" className="bg-[#102d27] px-5 py-28 text-white sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2 lg:items-center">
+          <div>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
+              <ShieldCheck className="h-7 w-7 text-[#f0c985]" />
+            </div>
+            <h2 className="mt-7 max-w-xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
+              Confiança vem de dizer exatamente o que existe.
+            </h2>
+          </div>
+          <div className="grid gap-4 text-white/68">
+            {[
+              'Autenticação gerenciada pelo Supabase.',
+              'Políticas de acesso para separar os dados de cada conta.',
+              'Validação de formulários antes de gravar informações.',
+              'Exportação dos dados operacionais em formatos acessíveis.',
+            ].map(item => (
+              <div key={item} className="flex items-start gap-3 border-b border-white/10 pb-4">
+                <Check className="mt-0.5 h-5 w-5 shrink-0 text-[#e8a84c]" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" className="mx-auto max-w-5xl px-5 py-28 sm:px-8">
+        <div className="text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#a66c22]">Perguntas honestas</p>
+          <h2 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Antes de começar</h2>
+        </div>
+
+        <div className="mt-14 border-t border-[#d7d1c6]">
+          {faqs.map((faq, index) => (
+            <div key={faq.question} className="border-b border-[#d7d1c6]">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-5 py-6 text-left text-lg font-semibold"
+                onClick={() => setActiveFaq(activeFaq === index ? null : index)}
+              >
+                {faq.question}
+                <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${activeFaq === index ? 'rotate-180' : ''}`} />
               </button>
-              
               <AnimatePresence>
                 {activeFaq === index && (
-                  <motion.div
+                  <motion.p
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
+                    className="max-w-3xl overflow-hidden pb-6 leading-7 text-[#68736f]"
                   >
-                    <p className="px-6 pb-6 pt-2 text-slate-400 text-sm leading-relaxed border-t border-slate-900/50">
-                      {item.a}
-                    </p>
-                  </motion.div>
+                    {faq.answer}
+                  </motion.p>
                 )}
               </AnimatePresence>
             </div>
@@ -591,79 +354,53 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Strong Final CTA */}
-      <section className="py-24 px-6 relative overflow-hidden bg-indigo-900/40 border-t border-slate-800 text-center">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="max-w-4xl mx-auto space-y-8 relative z-10 flex flex-col items-center">
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-            Chegou a hora de descomplicar a gestão da sua empresa
-          </h2>
-          <p className="text-indigo-200 text-lg max-w-xl font-normal leading-relaxed">
-            Junte-se a milhares de administradores e leve seu controle operacional para o próximo nível.
-          </p>
+      <section className="px-5 pb-10 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 rounded-[32px] bg-[#dca14d] p-8 text-[#17352d] sm:p-12 lg:flex-row lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em]">Leal ERP</p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+              Organize a operação antes que ela comece a cobrar esse preço.
+            </h2>
+          </div>
           <Link href="/login">
-            <Button size="lg" className="bg-white hover:bg-slate-100 text-indigo-950 font-bold px-10 py-7 rounded-xl shadow-2xl text-md flex items-center gap-2 group transition-all">
-              Começar Demonstração Gratuita
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            <Button size="lg" className="h-13 rounded-full bg-[#17352d] px-7 text-white hover:bg-[#214d42]">
+              Criar minha conta
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
         </div>
       </section>
 
-      {/* Complete Footer */}
-      <footer className="bg-slate-950 border-t border-slate-800/80 py-16 px-6 text-sm text-slate-500">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div className="space-y-4 col-span-2 md:col-span-1">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-extrabold text-sm">
-                L
-              </div>
-              <span className="font-extrabold text-md text-white">Leal ERP</span>
-            </div>
-            <p className="text-xs leading-relaxed max-w-xs">
-              SaaS ERP projetado para acelerar processos, garantir controle de estoque físico e simplificar lançamentos contábeis.
+      <footer className="bg-[#0c231e] px-5 py-14 text-white sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+          <div>
+            <BrandLogo inverted />
+            <p className="mt-5 max-w-sm text-sm leading-6 text-white/50">
+              Gestão empresarial direta para comércios e pequenas distribuidoras.
             </p>
           </div>
-
-          <div className="space-y-3">
-            <h4 className="font-semibold text-white uppercase text-xs tracking-widest">Produto</h4>
-            <ul className="space-y-2.5 text-xs">
-              <li><a href="#beneficios" className="hover:text-slate-300">Recursos</a></li>
-              <li><a href="#precos" className="hover:text-slate-300">Planos</a></li>
-              <li><a href="#faq" className="hover:text-slate-300">FAQs</a></li>
-            </ul>
+          <div>
+            <p className="text-sm font-semibold">Produto</p>
+            <div className="mt-4 grid gap-3 text-sm text-white/50">
+              <a href="#produto">Recursos</a>
+              <a href="#seguranca">Segurança</a>
+              <Link href="/login">Acessar</Link>
+            </div>
           </div>
-
-          <div className="space-y-3">
-            <h4 className="font-semibold text-white uppercase text-xs tracking-widest">Suporte</h4>
-            <ul className="space-y-2.5 text-xs">
-              <li><a href="#" className="hover:text-slate-300">WhatsApp Comercial</a></li>
-              <li><a href="#" className="hover:text-slate-300">Email de Contato</a></li>
-              <li><a href="#" className="hover:text-slate-300">Central de Ajuda</a></li>
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="font-semibold text-white uppercase text-xs tracking-widest">Legal</h4>
-            <ul className="space-y-2.5 text-xs">
-              <li><a href="#" className="hover:text-slate-300">Política de Privacidade</a></li>
-              <li><a href="#" className="hover:text-slate-300">Termos de Serviço</a></li>
-              <li><a href="#" className="hover:text-slate-300">Segurança de Dados</a></li>
-            </ul>
+          <div>
+            <p className="text-sm font-semibold">Informações</p>
+            <div className="mt-4 grid gap-3 text-sm text-white/50">
+              <Link href="/privacidade">Privacidade</Link>
+              <Link href="/termos">Termos de uso</Link>
+              <a href="mailto:contato@lealerp.com.br">Contato</a>
+            </div>
           </div>
         </div>
-
-        <div className="max-w-7xl mx-auto h-px bg-slate-900 my-12" />
-
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
-          <span>&copy; {new Date().getFullYear()} Leal ERP. Todos os direitos reservados.</span>
-          <span className="flex gap-4">
-            <a href="#" className="hover:text-white">LinkedIn</a>
-            <a href="#" className="hover:text-white">Instagram</a>
-            <a href="#" className="hover:text-white">GitHub</a>
-          </span>
+        <div className="mx-auto mt-12 flex max-w-7xl flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/35 sm:flex-row sm:justify-between">
+          <span>© {new Date().getFullYear()} Leal ERP.</span>
+          <span>Construído para simplificar operações reais.</span>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }
